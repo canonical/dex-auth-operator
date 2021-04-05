@@ -1,0 +1,35 @@
+name: Publish
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  charm:
+    name: Charm
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Install dependencies
+      run: |
+        sudo snap install charm --classic
+        sudo pip3 install charmcraft
+        sudo snap install yq
+
+    - name: Publish bundle
+      env:
+        CHARMSTORE_CREDENTIAL: ${{ secrets.CHARMSTORE_CREDENTIAL }}
+      run: |
+        set -eux
+        echo $CHARMSTORE_CREDENTIAL > ~/.go-cookies
+        IMAGE=$(yq eval '.resources.oci-image.upstream-source' metadata.yaml)
+        charmcraft build
+        docker pull $IMAGE
+        charm push ./dex-auth.charm \
+            cs:~dex-charmers/dex-auth \
+            --resource oci-image=$IMAGE
+
