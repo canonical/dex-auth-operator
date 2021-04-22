@@ -76,7 +76,7 @@ def test_main_oidc(mock_pw, harness):
 
 
 @patch("bcrypt.hashpw")
-def test_main_service_mesh(mock_pw, harness):
+def test_main_ingress(mock_pw, harness):
     mock_pw.return_value = "".encode("utf-8")
     harness.set_leader(True)
     harness.add_oci_resource(
@@ -87,17 +87,19 @@ def test_main_service_mesh(mock_pw, harness):
             "password": "",
         },
     )
-    rel_id = harness.add_relation("service-mesh", "app")
-    harness.begin_with_initial_hooks()
+    rel_id = harness.add_relation("ingress", "app")
     harness.add_relation_unit(rel_id, "app/0")
+    harness.update_relation_data(
+        rel_id,
+        "app",
+        {"_supported_versions": "- v1"},
+    )
+    harness.begin_with_initial_hooks()
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
     relation_data = harness.get_relation_data(rel_id, harness.charm.app.name)
     data = {
-        "auth": {},
-        "ingress": False,
         "port": 5556,
         "prefix": "/dex",
-        "rewrite": "/dex",
         "service": "dex-auth",
     }
 

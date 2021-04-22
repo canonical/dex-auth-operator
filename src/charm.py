@@ -12,11 +12,15 @@ import yaml
 
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, BlockedStatus
 from ops.framework import StoredState
 
 from oci_image import OCIImageResource, OCIImageResourceError
-from interface_service_mesh import ServiceMeshRequires
+from serialized_data_interface import (
+    NoCompatibleVersions,
+    NoVersionsListed,
+    get_interfaces,
+)
 
 try:
     import bcrypt
@@ -37,8 +41,14 @@ class Operator(CharmBase):
             return
         self.log = logging.getLogger(__name__)
         self.image = OCIImageResource(self, "oci-image")
-        self.service_mesh = ServiceMeshRequires(self, "service-mesh")
-
+        try:
+            self.interfaces = get_interfaces(self)
+        except NoVersionsListed as err:
+            self.model.unit.status = WaitingStatus(str(err))
+            return
+        except NoCompatibleVersions as err:
+            self.model.unit.status = BlockedStatus(str(err))
+            return
         self._stored.set_default(username="admin")
         self._stored.set_default(
             password="".join(random.choices(string.ascii_letters, k=30))
@@ -56,20 +66,17 @@ class Operator(CharmBase):
         ]:
             self.framework.observe(event, self.main)
 
-        self.framework.observe(
-            self.on.service_mesh_relation_joined, self.configure_mesh
-        )
-        self.framework.observe(
-            self.on.service_mesh_relation_changed, self.configure_mesh
-        )
+        self.framework.observe(self.on["ingress"].relation_changed, self.send_info)
 
-    def configure_mesh(self, event):
-        self.log.info("Adding route /dex to service mesh")
-        self.service_mesh.add_route(
-            prefix="/dex",
-            service=self.model.app.name,
-            port=self.model.config["port"],
-        )
+    def send_info(self, event):
+        if self.interfaces["ingress"]:
+            self.interfaces["ingress"].send_data(
+                {
+                    "prefix": "/dex",
+                    "service": self.model.app.name,
+                    "port": self.model.config["port"],
+                }
+            )
 
     def main(self, event):
         try:
