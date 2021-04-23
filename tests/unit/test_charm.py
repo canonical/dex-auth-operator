@@ -58,16 +58,19 @@ def test_main_oidc(mock_pw, harness):
     )
     rel_id = harness.add_relation("oidc-client", "app")
 
-    harness.begin_with_initial_hooks()
     harness.add_relation_unit(rel_id, "app/0")
     data = {
-        "data": "data",
+        "id": "id",
+        "name": "name",
+        "redirectURIs": ["uri1"],
+        "secret": "secret",
     }
     harness.update_relation_data(
         rel_id,
-        "app/0",
-        data,
+        "app",
+        {"_supported_versions": "- v1", "data": yaml.dump(data)},
     )
+    harness.begin_with_initial_hooks()
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
     pod_spec = harness.get_pod_spec()
     config_yaml = pod_spec[0]["containers"][0]["volumeConfig"][0]["files"][0]["content"]
@@ -99,6 +102,7 @@ def test_main_ingress(mock_pw, harness):
     relation_data = harness.get_relation_data(rel_id, harness.charm.app.name)
     data = {
         "port": 5556,
+        "rewrite": "/",
         "prefix": "/dex",
         "service": "dex-auth",
     }

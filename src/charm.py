@@ -73,6 +73,7 @@ class Operator(CharmBase):
             self.interfaces["ingress"].send_data(
                 {
                     "prefix": "/dex",
+                    "rewrite": "/",
                     "service": self.model.app.name,
                     "port": self.model.config["port"],
                 }
@@ -92,14 +93,10 @@ class Operator(CharmBase):
         port = self.model.config["port"]
         public_url = self.model.config["public-url"]
 
-        oidc_client_info = []
-        if "oidc-client" in self.model.relations:
-            for relation in self.model.relations["oidc-client"]:
-                for unit in relation.units:
-                    if unit in relation.data:
-                        relation_data = dict(relation.data[unit])
-                        oidc_client_info.append(relation_data)
-                        break
+        if (oidc_client := self.interfaces["oidc-client"]) and oidc_client.get_data():
+            oidc_client_info = list(oidc_client.get_data().values())
+        else:
+            oidc_client_info = []
 
         # Allows setting a basic username/password combo
         static_username = self.model.config["static-username"]
