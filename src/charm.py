@@ -41,6 +41,7 @@ class Operator(CharmBase):
             return
         self.log = logging.getLogger(__name__)
         self.image = OCIImageResource(self, "oci-image")
+
         try:
             self.interfaces = get_interfaces(self)
         except NoVersionsListed as err:
@@ -49,6 +50,9 @@ class Operator(CharmBase):
         except NoCompatibleVersions as err:
             self.model.unit.status = BlockedStatus(str(err))
             return
+        else:
+            self.model.unit.status = ActiveStatus()
+
         self._stored.set_default(username="admin")
         self._stored.set_default(
             password="".join(random.choices(string.ascii_letters, k=30))
