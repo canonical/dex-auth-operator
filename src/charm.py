@@ -178,7 +178,10 @@ class Operator(CharmBase):
                         "imageDetails": image_details,
                         "command": ["dex", "serve", "/etc/dex/cfg/config.yaml"],
                         "ports": [{"name": "http", "containerPort": port}],
-                        "envConfig": {"CONFIG_HASH": config_hash.hexdigest()},
+                        "envConfig": {
+                            "CONFIG_HASH": config_hash.hexdigest(),
+                            "KUBERNETES_POD_NAMESPACE": self.model.name,
+                        },
                         "volumeConfig": [
                             {
                                 "name": "config",
