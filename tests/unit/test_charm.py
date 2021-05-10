@@ -102,7 +102,7 @@ def test_main_ingress(mock_pw, harness):
     relation_data = harness.get_relation_data(rel_id, harness.charm.app.name)
     data = {
         "port": 5556,
-        "rewrite": "/",
+        "rewrite": "/dex",
         "prefix": "/dex",
         "service": "dex-auth",
     }

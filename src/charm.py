@@ -63,7 +63,6 @@ class Operator(CharmBase):
 
         for event in [
             self.on.install,
-            self.on.leader_elected,
             self.on.upgrade_charm,
             self.on.config_changed,
             self.on.oidc_client_relation_changed,
@@ -77,7 +76,7 @@ class Operator(CharmBase):
             self.interfaces["ingress"].send_data(
                 {
                     "prefix": "/dex",
-                    "rewrite": "/",
+                    "rewrite": "/dex",
                     "service": self.model.app.name,
                     "port": self.model.config["port"],
                 }
