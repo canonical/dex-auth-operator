@@ -12,10 +12,16 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test):
-    my_charm = await ops_test.build_charm(".")
+    local_charm = await ops_test.build_charm(".")
+    await ops_test.model.deploy("cs:dex-auth")
+    await ops_test.model.wait_for_idle()
+
+    charm_name = METADATA["name"]
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
+
+    app = ops_test.model.applications[charm_name]
     resources = {"oci-image": image_path}
-    await ops_test.model.deploy(my_charm, resources=resources)
+    await app.refresh(path=local_charm, resources=resources)
     await ops_test.model.wait_for_idle()
 
 
