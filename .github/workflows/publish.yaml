@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo snap install charm --classic
-        sudo pip3 install charmcraft
+        sudo snap install charmcraft
         sudo snap install yq
 
     - name: Publish bundle
@@ -27,7 +27,7 @@ jobs:
         set -eux
         echo $CHARMSTORE_CREDENTIAL > ~/.go-cookies
         IMAGE=$(yq eval '.resources.oci-image.upstream-source' metadata.yaml)
-        charmcraft build
+        tox -e build
         docker pull $IMAGE
         charm push ./dex-auth.charm \
             cs:~dex-charmers/dex-auth \

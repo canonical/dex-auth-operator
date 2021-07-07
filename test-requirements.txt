@@ -1,0 +1,6 @@
+pyyaml
+pytest
+bcrypt
+juju
+black
+flake8
