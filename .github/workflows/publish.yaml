@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo snap install charm --classic
-        sudo pip3 install charmcraft
+        sudo pip3 install charmcraft==1.0.0
         sudo snap install yq
 
     - name: Publish bundle
