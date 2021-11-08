@@ -9,13 +9,11 @@ from pathlib import Path
 from uuid import uuid4
 
 import yaml
-
-from ops.charm import CharmBase
-from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, BlockedStatus
-from ops.framework import StoredState
-
 from oci_image import OCIImageResource, OCIImageResourceError
+from ops.charm import CharmBase
+from ops.framework import StoredState
+from ops.main import main
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from serialized_data_interface import (
     NoCompatibleVersions,
     NoVersionsListed,
@@ -198,9 +196,7 @@ class Operator(CharmBase):
                 "kubernetesResources": {
                     "customResourceDefinitions": [
                         {"name": crd["metadata"]["name"], "spec": crd["spec"]}
-                        for crd in yaml.safe_load_all(
-                            Path("resources/crds.yaml").read_text()
-                        )
+                        for crd in yaml.safe_load_all(Path("src/crds.yaml").read_text())
                     ],
                 },
             }
