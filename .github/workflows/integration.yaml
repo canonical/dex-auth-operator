@@ -1,52 +1,44 @@
-name: Test Suite
-on: [pull_request]
+name: Tests
+
+on:
+  pull_request:
+  schedule:
+    - cron: '0 8 * * TUE'
 
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: [3.8, 3.9]
     steps:
     - name: Check out code
       uses: actions/checkout@v2
-    - name: Setup Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python }}
-    - name: Install Dependencies
-      run: |
-        pip install tox
-    - name: Run lint
-      run: tox -vve lint
+
+    - run: pip install tox
+    - run: tox -vve lint
+
   unit-test:
-    name: Unit Tests
+    name: Unit
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python: [3.8, 3.9]
     steps:
       - name: Check out code
         uses: actions/checkout@v2
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python }}
-      - name: Install Dependencies
-        run: |
-          pip install tox
-      - name: Run test
-        run: tox -e unit
+
+      - run: pip install tox
+      - run: tox -e unit
+
   integration-test:
-    name: Integration tests
+    name: Integration
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v2
+
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
             provider: microk8s
-      - name: Run test
-        run: tox -e integration
+            channel: 1.21/stable
+
+      # https://github.com/charmed-kubernetes/actions-operator/issues/27
+      - run: sudo snap refresh charmcraft --channel latest/candidate
+      - run: tox -e integration
