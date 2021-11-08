@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: '0 8 * * THU'
 
 jobs:
   charm:
-    name: Charm
+    name: Publish Charm
     runs-on: ubuntu-latest
 
     steps:
@@ -16,20 +18,25 @@ jobs:
 
     - name: Install dependencies
       run: |
-        sudo snap install charm --classic
-        sudo pip3 install charmcraft==1.0.0
+        set -eux
+        sudo snap install charmcraft --classic --channel=latest/candidate
         sudo snap install yq
 
-    - name: Publish bundle
+    - name: Charm
       env:
-        CHARMSTORE_CREDENTIAL: ${{ secrets.CHARMSTORE_CREDENTIAL }}
+        CHARMCRAFT_CREDENTIALS: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
+        CHARMCRAFT_DEVELOPER: "y"
       run: |
         set -eux
-        echo $CHARMSTORE_CREDENTIAL > ~/.go-cookies
-        IMAGE=$(yq eval '.resources.oci-image.upstream-source' metadata.yaml)
-        charmcraft build
-        docker pull $IMAGE
-        charm push ./dex-auth.charm \
-            cs:~dex-charmers/dex-auth \
-            --resource oci-image=$IMAGE
 
+        mkdir -p ~/snap/charmcraft/common/config/
+        echo "$CHARMCRAFT_CREDENTIALS" > ~/snap/charmcraft/common/config/charmcraft.credentials
+
+        NAME=$(yq eval '.name' metadata.yaml)
+        IMAGE=$(yq eval '.resources.oci-image.upstream-source' metadata.yaml)
+        charmcraft pack --destructive-mode
+        charmcraft upload-resource "$NAME" oci-image --image "$IMAGE"
+        REVISION=$(charmcraft resource-revisions "$NAME" oci-image 2>&1 | awk 'FNR == 2 {print $1}')
+        charmcraft upload ./*.charm \
+            --release=edge \
+            --resource=oci-image:"$REVISION"

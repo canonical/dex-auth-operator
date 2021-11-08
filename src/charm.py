@@ -198,9 +198,7 @@ class Operator(CharmBase):
                 "kubernetesResources": {
                     "customResourceDefinitions": [
                         {"name": crd["metadata"]["name"], "spec": crd["spec"]}
-                        for crd in yaml.safe_load_all(
-                            Path("resources/crds.yaml").read_text()
-                        )
+                        for crd in yaml.safe_load_all(Path("src/crds.yaml").read_text())
                     ],
                 },
             }
