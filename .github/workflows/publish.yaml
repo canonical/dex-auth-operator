@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - track/**
   schedule:
     - cron: '0 8 * * THU'
 
@@ -34,9 +35,12 @@ jobs:
 
         NAME=$(yq eval '.name' metadata.yaml)
         IMAGE=$(yq eval '.resources.oci-image.upstream-source' metadata.yaml)
+        REV=$(git rev-parse --abbrev-ref HEAD)
+        TRACK=$([[ "$REV" =~ ^(master|main)$ ]] && echo "latest" || echo "${REV#track/}")
+
         charmcraft pack --destructive-mode
         charmcraft upload-resource "$NAME" oci-image --image "$IMAGE"
         REVISION=$(charmcraft resource-revisions "$NAME" oci-image 2>&1 | awk 'FNR == 2 {print $1}')
         charmcraft upload ./*.charm \
-            --release=edge \
+            --release=$TRACK/edge \
             --resource=oci-image:"$REVISION"
