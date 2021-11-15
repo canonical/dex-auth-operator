@@ -1,6 +1,10 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 bcrypt<3.3
 black==20.8b1
 flake8<4.1
+flake8-copyright<0.3
 juju<2.10
 pytest<6.3
 pyyaml<6.1
