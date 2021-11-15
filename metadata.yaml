@@ -1,3 +1,6 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 name: dex-auth
 display-name: Dex
 summary: A federated OpenID Connect provider

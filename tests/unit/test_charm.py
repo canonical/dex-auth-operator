@@ -1,3 +1,6 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 import pytest
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
