@@ -2,25 +2,24 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import json
 import logging
-import random
-import string
 import subprocess
+from functools import wraps
+from glob import glob
 from hashlib import sha256
 from pathlib import Path
+from random import choices
+from string import ascii_letters
 from uuid import uuid4
 
 import yaml
-from oci_image import OCIImageResource, OCIImageResourceError
+from lightkube import ApiError, Client, codecs
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
-from serialized_data_interface import (
-    NoCompatibleVersions,
-    NoVersionsListed,
-    get_interfaces,
-)
+from serialized_data_interface import get_interface
 
 try:
     import bcrypt
@@ -30,95 +29,111 @@ except ImportError:
     import bcrypt
 
 
-class Operator(CharmBase):
-    _stored = StoredState()
+def only_leader(handler):
+    """Ensures method only runs if unit is a leader."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    @wraps(handler)
+    def wrapper(self, event):
         if not self.unit.is_leader():
             # We can't do anything useful when not the leader, so do nothing.
             self.model.unit.status = WaitingStatus("Waiting for leadership")
-            return
-        self.log = logging.getLogger(__name__)
-        self.image = OCIImageResource(self, "oci-image")
-
-        try:
-            self.interfaces = get_interfaces(self)
-        except NoVersionsListed as err:
-            self.model.unit.status = WaitingStatus(str(err))
-            return
-        except NoCompatibleVersions as err:
-            self.model.unit.status = BlockedStatus(str(err))
-            return
         else:
-            self.model.unit.status = ActiveStatus()
+            handler(self, event)
 
-        self._stored.set_default(username="admin")
-        self._stored.set_default(
-            password="".join(random.choices(string.ascii_letters, k=30))
-        )
-        generated_salt = bcrypt.gensalt()
-        self._stored.set_default(salt=generated_salt)
-        self._stored.set_default(user_id=str(uuid4()))
+    return wrapper
+
+
+class Operator(CharmBase):
+    state = StoredState()
+
+    def __init__(self, *args):
+        super().__init__(*args)
 
         for event in [
             self.on.install,
             self.on.upgrade_charm,
             self.on.config_changed,
             self.on.oidc_client_relation_changed,
+            self.on.ingress_relation_changed,
         ]:
             self.framework.observe(event, self.main)
 
-        self.framework.observe(self.on["ingress"].relation_changed, self.send_info)
+    @only_leader
+    def main(self, event):
+        self.model.unit.status = MaintenanceStatus("Calculating manifests")
+        self.ensure_state()
 
-    def send_info(self, event):
-        if self.interfaces["ingress"]:
-            self.interfaces["ingress"].send_data(
-                {
+        try:
+            manifest = self.get_manifest()
+        except Exception as err:
+            raise
+            self.model.unit.status = BlockedStatus(str(err))
+            return
+
+        self.model.unit.status = MaintenanceStatus("Applying manifests")
+        errors = self.set_manifest(manifest)
+
+        if errors:
+            self.model.unit.status = BlockedStatus(
+                f"There were {len(errors)} errors while applying manifests."
+            )
+            log = logging.getLogger(__name__)
+            for error in errors:
+                log.error(error)
+        else:
+            self.model.unit.status = ActiveStatus()
+
+    @only_leader
+    def remove(self, event):
+        """Remove charm."""
+
+        self.model.unit.status = MaintenanceStatus("Calculating manifests")
+        self.ensure_state()
+
+        manifest = self.get_manifest()
+
+        self.model.unit.status = MaintenanceStatus("Removing manifests")
+
+        self.remove_manifest(manifest)
+
+    def ensure_state(self):
+        self.state.set_default(
+            username="admin",
+            password="".join(choices(ascii_letters, k=30)),
+            salt=bcrypt.gensalt(),
+            user_id=str(uuid4()),
+        )
+
+    def get_manifest(self):
+        # Handle ingress
+        ingress = get_interface(self, "ingress")
+        if ingress:
+            for app_name, version in ingress.versions.items():
+                data = {
                     "prefix": "/dex",
                     "rewrite": "/dex",
                     "service": self.model.app.name,
                     "port": self.model.config["port"],
                 }
-            )
 
-    def main(self, event):
-        try:
-            image_details = self.image.fetch()
-        except OCIImageResourceError as e:
-            self.model.unit.status = e.status
-            self.log.info(e)
-            return
+                ingress.send_data(data, app_name)
 
-        self.model.unit.status = MaintenanceStatus("Setting pod spec")
-
-        connectors = yaml.safe_load(self.model.config["connectors"])
-        port = self.model.config["port"]
-        public_url = self.model.config["public-url"]
-
-        if (oidc_client := self.interfaces["oidc-client"]) and oidc_client.get_data():
-            oidc_client_info = list(oidc_client.get_data().values())
+        # Get OIDC client info
+        oidc = get_interface(self, "oidc-client")
+        if oidc:
+            oidc_client_info = list(oidc.get_data().values())
         else:
             oidc_client_info = []
 
-        # Allows setting a basic username/password combo
-        static_username = self.model.config["static-username"]
-        static_password = self.model.config["static-password"]
+        # Load config values as convenient variables
+        connectors = yaml.safe_load(self.model.config["connectors"])
+        port = self.model.config["port"]
+        public_url = self.model.config["public-url"]
+        static_username = self.model.config["static-username"] or self.state.username
+        static_password = self.model.config["static-password"] or self.state.password
+        static_password = static_password.encode("utf-8")
+        hashed = bcrypt.hashpw(static_password, self.state.salt).decode("utf-8")
 
-        static_config = {}
-
-        # Dex needs some way of logging in, so if nothing has been configured,
-        # just generate a username/password
-        if not static_username:
-            static_username = self._stored.username
-
-        if not static_password:
-            static_password = self._stored.password
-
-        salt = self._stored.salt
-        user_id = self._stored.user_id
-
-        hashed = bcrypt.hashpw(static_password.encode("utf-8"), salt).decode("utf-8")
         static_config = {
             "enablePasswordDB": True,
             "staticPasswords": [
@@ -126,12 +141,12 @@ class Operator(CharmBase):
                     "email": static_username,
                     "hash": hashed,
                     "username": static_username,
-                    "userID": user_id,
+                    "userID": self.state.user_id,
                 }
             ],
         }
 
-        config = yaml.dump(
+        config = json.dumps(
             {
                 "issuer": f"{public_url}/dex",
                 "storage": {"type": "kubernetes", "config": {"inCluster": True}},
@@ -143,67 +158,47 @@ class Operator(CharmBase):
                 **static_config,
             }
         )
+
         # Kubernetes won't automatically restart the pod when the configmap changes
         # unless we manually add the hash somewhere into the Deployment spec, so that
         # it changes whenever the configmap changes.
         config_hash = sha256()
         config_hash.update(config.encode("utf-8"))
 
-        self.model.pod.set_spec(
-            {
-                "version": 3,
-                "serviceAccount": {
-                    "roles": [
-                        {
-                            "global": True,
-                            "rules": [
-                                {
-                                    "apiGroups": ["dex.coreos.com"],
-                                    "resources": ["*"],
-                                    "verbs": ["*"],
-                                },
-                                {
-                                    "apiGroups": ["apiextensions.k8s.io"],
-                                    "resources": ["customresourcedefinitions"],
-                                    "verbs": ["create"],
-                                },
-                            ],
-                        },
-                    ],
-                },
-                "containers": [
-                    {
-                        "name": "dex-auth",
-                        "imageDetails": image_details,
-                        "command": ["dex", "serve", "/etc/dex/cfg/config.yaml"],
-                        "ports": [{"name": "http", "containerPort": port}],
-                        "envConfig": {
-                            "CONFIG_HASH": config_hash.hexdigest(),
-                            "KUBERNETES_POD_NAMESPACE": self.model.name,
-                        },
-                        "volumeConfig": [
-                            {
-                                "name": "config",
-                                "mountPath": "/etc/dex/cfg",
-                                "files": [
-                                    {
-                                        "path": "config.yaml",
-                                        "content": config,
-                                    },
-                                ],
-                            },
-                        ],
-                    }
-                ],
-                "kubernetesResources": {
-                    "customResourceDefinitions": [
-                        {"name": crd["metadata"]["name"], "spec": crd["spec"]}
-                        for crd in yaml.safe_load_all(Path("src/crds.yaml").read_text())
-                    ],
-                },
-            }
-        )
-        self.model.unit.status = ActiveStatus()
+        context = {
+            "name": self.model.app.name.replace("-operator", ""),
+            "namespace": self.model.name,
+            "port": self.model.config["port"],
+            "config_yaml": config,
+            "config_hash": config_hash.hexdigest(),
+        }
+
+        return [
+            obj
+            for path in glob("src/manifests/*.yaml")
+            for obj in codecs.load_all_yaml(Path(path).read_text(), context=context)
+        ]
+
+    def set_manifest(self, manifest):
+        client = Client()
+        errors = []
+
+        for resource in manifest:
+            try:
+                client.create(resource)
+            except ApiError as err:
+                if err.status.reason == "AlreadyExists":
+                    client.patch(type(resource), resource.metadata.name, resource)
+                else:
+                    errors.append(err)
+
+        return errors
+
+    def remove_manifest(self, manifest):
+        client = Client()
+
+        for resource in manifest:
+            client.delete(type(resource), resource.metadata.name)
 
 
 if __name__ == "__main__":
