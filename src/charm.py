@@ -35,23 +35,9 @@ class Operator(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        if not self.unit.is_leader():
-            # We can't do anything useful when not the leader, so do nothing.
-            self.model.unit.status = WaitingStatus("Waiting for leadership")
-            return
+
         self.log = logging.getLogger(__name__)
         self.image = OCIImageResource(self, "oci-image")
-
-        try:
-            self.interfaces = get_interfaces(self)
-        except NoVersionsListed as err:
-            self.model.unit.status = WaitingStatus(str(err))
-            return
-        except NoCompatibleVersions as err:
-            self.model.unit.status = BlockedStatus(str(err))
-            return
-        else:
-            self.model.unit.status = ActiveStatus()
 
         self._stored.set_default(username="admin")
         self._stored.set_default(
@@ -66,40 +52,35 @@ class Operator(CharmBase):
             self.on.upgrade_charm,
             self.on.config_changed,
             self.on.oidc_client_relation_changed,
+            self.on.ingress_relation_changed,
         ]:
             self.framework.observe(event, self.main)
 
-        self.framework.observe(self.on["ingress"].relation_changed, self.send_info)
-
-    def send_info(self, event):
-        if self.interfaces["ingress"]:
-            self.interfaces["ingress"].send_data(
-                {
-                    "prefix": "/dex",
-                    "rewrite": "/dex",
-                    "service": self.model.app.name,
-                    "port": self.model.config["port"],
-                }
-            )
-
     def main(self, event):
-        try:
-            image_details = self.image.fetch()
-        except OCIImageResourceError as e:
-            self.model.unit.status = e.status
-            self.log.info(e)
+
+        if not self.unit.is_leader():
+            # Can't handle leader checks as usual due to config_hash throwing us into an
+            # infinite loop on leader_changed events.
             return
+
+        try:
+            interfaces = self._get_interfaces()
+
+            image_details = self._check_image_details()
+
+            oidc_client_info = self._check_oidc_client(interfaces)
+
+        except CheckFailed as error:
+            self.model.unit.status = error.status
+            return
+
+        self._send_info(interfaces)
 
         self.model.unit.status = MaintenanceStatus("Setting pod spec")
 
         connectors = yaml.safe_load(self.model.config["connectors"])
         port = self.model.config["port"]
         public_url = self.model.config["public-url"]
-
-        if (oidc_client := self.interfaces["oidc-client"]) and oidc_client.get_data():
-            oidc_client_info = list(oidc_client.get_data().values())
-        else:
-            oidc_client_info = []
 
         # Allows setting a basic username/password combo
         static_username = self.model.config["static-username"]
@@ -204,6 +185,52 @@ class Operator(CharmBase):
             }
         )
         self.model.unit.status = ActiveStatus()
+
+    def _send_info(self, interfaces):
+        if interfaces["ingress"]:
+            interfaces["ingress"].send_data(
+                {
+                    "prefix": "/dex",
+                    "rewrite": "/dex",
+                    "service": self.model.app.name,
+                    "port": self.model.config["port"],
+                }
+            )
+
+    def _get_interfaces(self):
+        try:
+            interfaces = get_interfaces(self)
+        except NoVersionsListed as err:
+            raise CheckFailed(err, WaitingStatus)
+        except NoCompatibleVersions as err:
+            raise CheckFailed(err, BlockedStatus)
+        return interfaces
+
+    def _check_image_details(self):
+        try:
+            image_details = self.image.fetch()
+        except OCIImageResourceError as e:
+            raise CheckFailed(f"{e.status_message}: oci-image", e.status_type)
+        return image_details
+
+    def _check_oidc_client(self, interfaces):
+        if (oidc_client := interfaces["oidc-client"]) and oidc_client.get_data():
+            oidc_client_info = list(oidc_client.get_data().values())
+        else:
+            oidc_client_info = []
+
+        return oidc_client_info
+
+
+class CheckFailed(Exception):
+    """ Raise this exception if one of the checks in main fails. """
+
+    def __init__(self, msg, status_type=None):
+        super().__init__()
+
+        self.msg = msg
+        self.status_type = status_type
+        self.status = status_type(msg)
 
 
 if __name__ == "__main__":

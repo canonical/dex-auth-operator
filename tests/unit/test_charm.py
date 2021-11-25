@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 import pytest
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 from unittest.mock import patch
 import yaml
@@ -13,11 +13,6 @@ from charm import Operator
 @pytest.fixture
 def harness():
     return Harness(Operator)
-
-
-def test_not_leader(harness):
-    harness.begin()
-    assert isinstance(harness.charm.model.unit.status, WaitingStatus)
 
 
 def test_missing_image(harness):
