@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 name: dex-auth
-display-name: Dex
 summary: A federated OpenID Connect provider
 description: |
   Dex is an identity service that uses OpenID Connect to drive authentication for other apps.

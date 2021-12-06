@@ -3,44 +3,26 @@ name: Publish
 on:
   push:
     branches:
+      - master
       - main
       - track/**
-  schedule:
-    - cron: '0 8 * * THU'
+  pull_request:
+    branches:
+      - master
+      - main
+      - track/**
 
 jobs:
-  charm:
+  publish-charm:
     name: Publish Charm
     runs-on: ubuntu-latest
-
+    # Only publish to charmhub if we are pushing to a special branch or running PRs from something named `branch/*`
+    if: (github.event_name == 'push') ||  (startsWith( github.head_ref, 'branch/' ))
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-
-    - name: Install dependencies
-      run: |
-        set -eux
-        sudo snap install charmcraft --classic --channel=latest/candidate
-        sudo snap install yq
-
-    - name: Charm
-      env:
-        CHARMCRAFT_CREDENTIALS: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
-        CHARMCRAFT_DEVELOPER: "y"
-      run: |
-        set -eux
-
-        mkdir -p ~/snap/charmcraft/common/config/
-        echo "$CHARMCRAFT_CREDENTIALS" > ~/snap/charmcraft/common/config/charmcraft.credentials
-
-        NAME=$(yq eval '.name' metadata.yaml)
-        IMAGE=$(yq eval '.resources.oci-image.upstream-source' metadata.yaml)
-        REV=$(git rev-parse --abbrev-ref HEAD)
-        TRACK=$([[ "$REV" =~ ^(master|main)$ ]] && echo "latest" || echo "${REV#track/}")
-
-        charmcraft pack --destructive-mode
-        charmcraft upload-resource "$NAME" oci-image --image "$IMAGE"
-        REVISION=$(charmcraft resource-revisions "$NAME" oci-image 2>&1 | awk 'FNR == 2 {print $1}')
-        charmcraft upload ./*.charm \
-            --release=$TRACK/edge \
-            --resource=oci-image:"$REVISION"
+      - uses: actions/checkout@v2
+      # TODO: Update to @main when https://github.com/canonical/charmhub-upload-action/pull/3 merged
+      - uses: canonical/charmhub-upload-action@branch/upload-charm-revisions
+        with:
+          credentials: ${{ secrets.CHARMCRAFT_CREDENTIALS }}
+          charm-path: ./
+          charmcraft-channel: latest/edge
