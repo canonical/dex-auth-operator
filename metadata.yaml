@@ -1,12 +1,9 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-
 name: dex-auth
 summary: A federated OpenID Connect provider
 description: |
   Dex is an identity service that uses OpenID Connect to drive authentication for other apps.
-maintainers: [Juju Developers <juju@lists.ubuntu.com>]
-tags: [kubernetes, dex, oauth, oidc, authentication]
 requires:
   oidc-client:
     interface: oidc-client
