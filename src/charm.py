@@ -94,14 +94,15 @@ class Operator(CharmBase):
             # Ensure requested resources are up
             try:
                 for attempt in Retrying(
-                        retry=retry_if_exception_type(CheckFailed),
-                        stop=stop_after_delay(max_delay=self._max_time_checking_resources),
-                        wait=wait_exponential(multiplier=0.1, min=0.1, max=15),
-                        reraise=True,
+                    retry=retry_if_exception_type(CheckFailed),
+                    stop=stop_after_delay(max_delay=self._max_time_checking_resources),
+                    wait=wait_exponential(multiplier=0.1, min=0.1, max=15),
+                    reraise=True,
                 ):
                     with attempt:
                         self.logger.info(
-                            f"Checking status of requested resources (attempt {attempt.retry_state.attempt_number})"
+                            f"Checking status of requested resources (attempt "
+                            f"{attempt.retry_state.attempt_number})"
                         )
                         self._check_deployed_resources()
             except CheckFailed:
@@ -241,7 +242,9 @@ class Operator(CharmBase):
                 )
 
         self.logger.info("Checking readiness of found StatefulSets/Deployments")
-        statefulsets_ok, statefulsets_errors = validate_statefulsets_and_deployments(found_resources)
+        statefulsets_ok, statefulsets_errors = validate_statefulsets_and_deployments(
+            found_resources
+        )
         errors.extend(statefulsets_errors)
 
         # Log any errors
@@ -311,6 +314,7 @@ class CheckFailed(Exception):
         self.msg = str(msg)
         self.status_type = status_type
         self.status = status_type(msg)
+
 
 if __name__ == "__main__":
     main(Operator)
