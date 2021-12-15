@@ -15,11 +15,19 @@ from uuid import uuid4
 
 import yaml
 from lightkube import ApiError, Client, codecs
+from lightkube.resources.apps_v1 import StatefulSet, Deployment
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from serialized_data_interface import get_interface
+from tenacity import (
+    Retrying,
+    retry_if_exception_type,
+    stop_after_delay,
+    wait_exponential,
+)
+
 
 try:
     import bcrypt
@@ -49,6 +57,8 @@ class Operator(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
+        self.logger: logging.Logger = logging.getLogger(__name__)
+
         for event in [
             self.on.install,
             self.on.upgrade_charm,
@@ -58,6 +68,8 @@ class Operator(CharmBase):
         ]:
             self.framework.observe(event, self.main)
 
+        self._max_time_checking_resources = 150
+
     @only_leader
     def main(self, event):
         self.model.unit.status = MaintenanceStatus("Calculating manifests")
@@ -66,7 +78,6 @@ class Operator(CharmBase):
         try:
             manifest = self.get_manifest()
         except Exception as err:
-            raise
             self.model.unit.status = BlockedStatus(str(err))
             return
 
@@ -77,10 +88,30 @@ class Operator(CharmBase):
             self.model.unit.status = BlockedStatus(
                 f"There were {len(errors)} errors while applying manifests."
             )
-            log = logging.getLogger(__name__)
             for error in errors:
-                log.error(error)
+                self.logger.error(error)
         else:
+            # Ensure requested resources are up
+            try:
+                for attempt in Retrying(
+                    retry=retry_if_exception_type(CheckFailed),
+                    stop=stop_after_delay(max_delay=self._max_time_checking_resources),
+                    wait=wait_exponential(multiplier=0.1, min=0.1, max=15),
+                    reraise=True,
+                ):
+                    with attempt:
+                        self.logger.info(
+                            f"Checking status of requested resources (attempt "
+                            f"{attempt.retry_state.attempt_number})"
+                        )
+                        self._check_deployed_resources()
+            except CheckFailed:
+                self.unit.status = BlockedStatus(
+                    "Some Kubernetes resources did not start correctly during install"
+                )
+                return
+
+            # Otherwise, application is working as expected
             self.model.unit.status = ActiveStatus()
 
     @only_leader
@@ -179,7 +210,57 @@ class Operator(CharmBase):
             for obj in codecs.load_all_yaml(Path(path).read_text(), context=context)
         ]
 
-    def set_manifest(self, manifest):
+    def _check_deployed_resources(self, manifest=None):
+        """Check the status of deployed resources, returning True if ok else raising CheckFailed
+
+        All abnormalities are captured in logs
+
+        Params:
+          manifest: (Optional) list of lightkube objects describing the entire application.  If
+                    omitted, will be computed using self.get_manifest()
+        """
+        if manifest:
+            expected_resources = manifest
+        else:
+            expected_resources = self.get_manifest()
+        found_resources = [None] * len(expected_resources)
+        errors = []
+
+        client = Client()
+
+        self.logger.info("Checking for expected resources")
+        for i, resource in enumerate(expected_resources):
+            try:
+                found_resources[i] = client.get(
+                    type(resource),
+                    resource.metadata.name,
+                    namespace=resource.metadata.namespace,
+                )
+            except ApiError:
+                errors.append(
+                    f"Cannot find k8s object for metadata '{resource.metadata}'"
+                )
+
+        self.logger.info("Checking readiness of found StatefulSets/Deployments")
+        statefulsets_ok, statefulsets_errors = validate_statefulsets_and_deployments(
+            found_resources
+        )
+        errors.extend(statefulsets_errors)
+
+        # Log any errors
+        for err in errors:
+            self.logger.info(err)
+
+        if len(errors) == 0:
+            return True
+        else:
+            raise CheckFailed(
+                "Some Kubernetes resources missing/not ready.  See logs for details",
+                WaitingStatus,
+            )
+
+    @staticmethod
+    def set_manifest(manifest):
         client = Client()
         errors = []
 
@@ -194,11 +275,45 @@ class Operator(CharmBase):
 
         return errors
 
-    def remove_manifest(self, manifest):
+    @staticmethod
+    def remove_manifest(manifest):
         client = Client()
 
         for resource in manifest:
             client.delete(type(resource), resource.metadata.name)
+
+
+def validate_statefulsets_and_deployments(objs):
+    """Determines if all StatefulSets/Deployments have the expected number of readyReplicas
+
+    Returns: Tuple of (Success [Boolean], Errors [list of str error messages]
+    """
+    errors = []
+
+    for obj in objs:
+        if isinstance(obj, (StatefulSet, Deployment)):
+            readyReplicas = obj.status.readyReplicas
+            replicas_expected = obj.spec.replicas
+            if readyReplicas != replicas_expected:
+                message = (
+                    f"StatefulSet {obj.metadata.name} in namespace "
+                    f"{obj.metadata.namespace} has {readyReplicas} readyReplicas, "
+                    f"expected {replicas_expected}"
+                )
+                errors.append(message)
+
+    return len(errors) == 0, errors
+
+
+class CheckFailed(Exception):
+    """Raise this exception if one of the checks in main fails."""
+
+    def __init__(self, msg, status_type=None):
+        super().__init__()
+
+        self.msg = str(msg)
+        self.status_type = status_type
+        self.status = status_type(msg)
 
 
 if __name__ == "__main__":

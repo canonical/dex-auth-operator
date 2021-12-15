@@ -31,11 +31,15 @@ def ensure_state(self):
     self.state.user_id = "123"
 
 
+@patch("charm.Operator._check_deployed_resources")
 @patch("charm.codecs")
 @patch("charm.Client")
 @patch.object(Operator, "ensure_state", ensure_state)
-def test_main_no_relation(mock_client, mock_codecs, harness):
+def test_main_no_relation(
+    mock_client, mock_codecs, mock_check_deployed_resources, harness
+):
     mock_codecs.load_all_yaml.return_value = [42]
+    mock_check_deployed_resources.return_value = True
 
     harness.set_leader(True)
     harness.begin_with_initial_hooks()
@@ -83,11 +87,13 @@ def test_main_no_relation(mock_client, mock_codecs, harness):
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
 
 
+@patch("charm.Operator._check_deployed_resources")
 @patch("charm.codecs")
 @patch("charm.Client")
 @patch.object(Operator, "ensure_state", ensure_state)
-def test_main_oidc(mock_client, mock_codecs, harness):
+def test_main_oidc(mock_client, mock_codecs, mock_check_deployed_resources, harness):
     mock_codecs.load_all_yaml.return_value = [42]
+    mock_check_deployed_resources.return_value = True
 
     harness.set_leader(True)
     rel_id = harness.add_relation("oidc-client", "app")
@@ -151,11 +157,13 @@ def test_main_oidc(mock_client, mock_codecs, harness):
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
 
 
+@patch("charm.Operator._check_deployed_resources")
 @patch("charm.codecs")
 @patch("charm.Client")
 @patch.object(Operator, "ensure_state", ensure_state)
-def test_main_ingress(mock_client, mock_codecs, harness):
+def test_main_ingress(mock_client, mock_codecs, mock_check_deployed_resources, harness):
     mock_codecs.load_all_yaml.return_value = [42]
+    mock_check_deployed_resources.return_value = True
 
     harness.set_leader(True)
     rel_id = harness.add_relation("ingress", "app")

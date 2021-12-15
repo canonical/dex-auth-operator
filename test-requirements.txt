@@ -8,3 +8,4 @@ flake8-copyright<0.3
 juju<2.10
 pytest<6.3
 pyyaml<6.1
+pytest-mock

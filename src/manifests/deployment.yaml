@@ -3,19 +3,19 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ name }}
-  name: {{ name }}
+    app.kubernetes.io/name: {{ name }}-charm
+  name: {{ name }}-charm
 spec:
   replicas: 1
   selector:
     matchLabels:
-        app: {{ name }}
+      app.kubernetes.io/name: {{ name }}-charm
   template:
     metadata:
       labels:
-        app: {{ name }}
+        app.kubernetes.io/name: {{ name }}-charm
     spec:
-      serviceAccountName: {{ name }}
+      serviceAccountName: {{ name }}-charm
       containers:
       - image: quay.io/dexidp/dex:v2.22.0
         name: dex
@@ -34,7 +34,7 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: {{ name }}
+          name: {{ name }}-charm
           items:
           - key: config.yaml
             path: config.yaml
