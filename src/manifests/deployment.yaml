@@ -3,19 +3,19 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app.kubernetes.io/name: {{ name }}-charm
-  name: {{ name }}-charm
+    app.kubernetes.io/name: {{ name }}-workload
+  name: {{ name }}-workload
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: {{ name }}-charm
+      app.kubernetes.io/name: {{ name }}-workload
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: {{ name }}-charm
+        app.kubernetes.io/name: {{ name }}-workload
     spec:
-      serviceAccountName: {{ name }}-charm
+      serviceAccountName: {{ name }}-workload
       containers:
       - image: quay.io/dexidp/dex:v2.22.0
         name: dex
@@ -34,7 +34,7 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: {{ name }}-charm
+          name: {{ name }}-workload
           items:
           - key: config.yaml
             path: config.yaml

@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ name }}-charm
+  name: {{ name }}-workload
 rules:
 - apiGroups: ["dex.coreos.com"] # API group created by dex
   resources: ["*"]
@@ -14,20 +14,20 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ name }}-charm
+  name: {{ name }}-workload
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ name }}-charm
+  name: {{ name }}-workload
 subjects:
 - kind: ServiceAccount
-  name: {{ name }}-charm
+  name: {{ name }}-workload
   namespace: {{ namespace }}
 ---
 apiVersion: v1
 automountServiceAccountToken: true
 kind: ServiceAccount
 metadata:
-  name: {{ name }}-charm
+  name: {{ name }}-workload
   namespace: {{ namespace }}
 

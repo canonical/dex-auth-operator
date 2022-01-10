@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ name }}-charm
+  name: {{ name }}-workload
 data:
   config.yaml: |
     {{ config_yaml }}

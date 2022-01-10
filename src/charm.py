@@ -70,6 +70,8 @@ class Operator(CharmBase):
 
         self._max_time_checking_resources = 150
 
+        self._workload_service_name = self.model.app.name + "-workload"
+
     @only_leader
     def main(self, event):
         self.model.unit.status = MaintenanceStatus("Calculating manifests")
@@ -143,7 +145,7 @@ class Operator(CharmBase):
                 data = {
                     "prefix": "/dex",
                     "rewrite": "/dex",
-                    "service": self.model.app.name,
+                    "service": self._workload_service_name,
                     "port": self.model.config["port"],
                 }
 

@@ -2,7 +2,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ name }}-charm
+  name: {{ name }}-workload
 spec:
   type: ClusterIP
   ports:
@@ -11,5 +11,5 @@ spec:
     protocol: TCP
     targetPort: {{ port }}
   selector:
-    app.kubernetes.io/name: {{ name }}-charm
+    app.kubernetes.io/name: {{ name }}-workload
 
