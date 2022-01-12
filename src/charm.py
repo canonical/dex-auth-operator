@@ -179,7 +179,7 @@ class Operator(CharmBase):
             ],
         }
 
-        config = json.dumps(
+        config = yaml.dump(
             {
                 "issuer": f"{public_url}/dex",
                 "storage": {"type": "kubernetes", "config": {"inCluster": True}},

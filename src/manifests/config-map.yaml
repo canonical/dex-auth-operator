@@ -5,4 +5,4 @@ metadata:
   name: {{ name }}-workload
 data:
   config.yaml: |
-    {{ config_yaml }}
+    {{ config_yaml|indent(4) }}
