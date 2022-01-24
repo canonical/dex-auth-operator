@@ -64,12 +64,11 @@ class Operator(CharmBase):
             self.on.upgrade_charm,
             self.on.config_changed,
             self.on.oidc_client_relation_changed,
+            self.on.ingress_relation_changed,
         ]:
             self.framework.observe(event, self.main)
 
-        self.framework.observe(self.on["ingress"].relation_changed, self.send_info)
-
-    def send_info(self, event):
+    def send_info(self):
         if self.interfaces["ingress"]:
             self.interfaces["ingress"].send_data(
                 {
@@ -98,6 +97,8 @@ class Operator(CharmBase):
             oidc_client_info = list(oidc_client.get_data().values())
         else:
             oidc_client_info = []
+
+        self.send_info()
 
         # Allows setting a basic username/password combo
         static_username = self.model.config["static-username"]
