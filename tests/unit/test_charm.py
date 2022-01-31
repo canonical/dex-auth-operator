@@ -46,7 +46,7 @@ def test_main_no_relation(
 
     # Ensure that manifests were loaded
     config_yaml = {
-        "issuer": "/dex",
+        "issuer": "http:///dex",
         "storage": {"type": "kubernetes", "config": {"inCluster": True}},
         "web": {"http": "0.0.0.0:5556"},
         "logger": {"level": "debug", "format": "text"},
@@ -70,7 +70,7 @@ def test_main_no_relation(
         "namespace": None,
         "port": 5556,
         "config_yaml": json.dumps(config_yaml),
-        "config_hash": "1419b40a8f223615121b8b1ffdb83a689c5da15e16b9b7fd71c192a544295995",
+        "config_hash": "de746b7609029af76f80a7daa43df83121715d1434baf13a36b32b02220b01b9",
     }
     context = tuple(sorted(context.items()))
     expected = {(m, context) for m in manifests}
@@ -114,7 +114,7 @@ def test_main_oidc(mock_client, mock_codecs, mock_check_deployed_resources, harn
 
     # Ensure that manifests were loaded
     config_yaml = {
-        "issuer": "/dex",
+        "issuer": "http:///dex",
         "storage": {"type": "kubernetes", "config": {"inCluster": True}},
         "web": {"http": "0.0.0.0:5556"},
         "logger": {"level": "debug", "format": "text"},
@@ -140,7 +140,7 @@ def test_main_oidc(mock_client, mock_codecs, mock_check_deployed_resources, harn
         "namespace": None,
         "port": 5556,
         "config_yaml": json.dumps(config_yaml),
-        "config_hash": "2fc46e9ce15bc29e0c3c317f4de635f1295265d05c410e96843140369ee3bf50",
+        "config_hash": "1169f8e7519f64a078398503f8d783973013c5931cab07990d5ee4b2faba5b07",
     }
     context = tuple(sorted(context.items()))
     expected = {(m, context) for m in manifests}
@@ -177,7 +177,7 @@ def test_main_ingress(mock_client, mock_codecs, mock_check_deployed_resources, h
 
     # Ensure that manifests were loaded
     config_yaml = {
-        "issuer": "/dex",
+        "issuer": "http:///dex",
         "storage": {"type": "kubernetes", "config": {"inCluster": True}},
         "web": {"http": "0.0.0.0:5556"},
         "logger": {"level": "debug", "format": "text"},
@@ -201,7 +201,7 @@ def test_main_ingress(mock_client, mock_codecs, mock_check_deployed_resources, h
         "namespace": None,
         "port": 5556,
         "config_yaml": json.dumps(config_yaml),
-        "config_hash": "1419b40a8f223615121b8b1ffdb83a689c5da15e16b9b7fd71c192a544295995",
+        "config_hash": "de746b7609029af76f80a7daa43df83121715d1434baf13a36b32b02220b01b9",
     }
     context = tuple(sorted(context.items()))
     expected = {(m, context) for m in manifests}
