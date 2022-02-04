@@ -20,7 +20,7 @@ from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
-from serialized_data_interface import get_interface
+from serialized_data_interface import get_interface, NoVersionsListed
 from tenacity import (
     Retrying,
     retry_if_exception_type,
@@ -94,7 +94,7 @@ class Operator(CharmBase):
             # Ensure requested resources are up
             try:
                 for attempt in Retrying(
-                    retry=retry_if_exception_type(CheckFailed),
+                    retry=retry_if_exception_type(CheckFailedError),
                     stop=stop_after_delay(max_delay=self._max_time_checking_resources),
                     wait=wait_exponential(multiplier=0.1, min=0.1, max=15),
                     reraise=True,
@@ -105,7 +105,7 @@ class Operator(CharmBase):
                             f"{attempt.retry_state.attempt_number})"
                         )
                         self._check_deployed_resources()
-            except CheckFailed:
+            except CheckFailedError:
                 self.unit.status = BlockedStatus(
                     "Some Kubernetes resources did not start correctly during install"
                 )
@@ -137,7 +137,21 @@ class Operator(CharmBase):
 
     def get_manifest(self):
         # Handle ingress
-        ingress = get_interface(self, "ingress")
+        ingress = None
+        try:
+            ingress = self._get_interface("ingress")
+            print(
+                "DEBUGGING ~ file: charm.py ~ line 142 ~ try get ingress interface",
+                ingress,
+            )
+        except CheckFailedError as check_failed:
+            print(
+                "DEBUGGING ~ file: charm.py ~ line 144 ~ check_failed to get ingress interface",
+                check_failed,
+            )
+            self.model.unit.status = check_failed.status
+            self.logger.info(str(check_failed.status))
+
         if ingress:
             for app_name, version in ingress.versions.items():
                 data = {
@@ -150,7 +164,13 @@ class Operator(CharmBase):
                 ingress.send_data(data, app_name)
 
         # Get OIDC client info
-        oidc = get_interface(self, "oidc-client")
+        oidc = None
+        try:
+            oidc = self._get_interface("oidc-client")
+        except CheckFailedError as check_failed:
+            self.model.unit.status = check_failed.status
+            self.logger.info(str(check_failed.status))
+
         if oidc:
             oidc_client_info = list(oidc.get_data().values())
         else:
@@ -213,7 +233,7 @@ class Operator(CharmBase):
         ]
 
     def _check_deployed_resources(self, manifest=None):
-        """Check the status of deployed resources, returning True if ok else raising CheckFailed
+        """Check the status of deployed resources, returning True if ok else raising CheckFailedError
 
         All abnormalities are captured in logs
 
@@ -256,10 +276,25 @@ class Operator(CharmBase):
         if len(errors) == 0:
             return True
         else:
-            raise CheckFailed(
+            raise CheckFailedError(
                 "Some Kubernetes resources missing/not ready.  See logs for details",
                 WaitingStatus,
             )
+
+    def _get_interface(self, interface_name):
+        # Remove this abstraction when SDI adds .status attribute to NoVersionsListed,
+        # NoCompatibleVersionsListed:
+        # https://github.com/canonical/serialized-data-interface/issues/26
+        try:
+            print("DEBUGGING ~ file: charm.py ~ line 279 ~ _get_interface try")
+            interface = get_interface(self, interface_name)
+        except NoVersionsListed as err:
+            print(
+                "DEBUGGING ~ file: charm.py ~ line 282 ~ NoVersionsListed err caught",
+                err,
+            )
+            raise CheckFailedError(str(err), WaitingStatus)
+        return interface
 
     @staticmethod
     def set_manifest(manifest):
@@ -307,7 +342,7 @@ def validate_statefulsets_and_deployments(objs):
     return len(errors) == 0, errors
 
 
-class CheckFailed(Exception):
+class CheckFailedError(Exception):
     """Raise this exception if one of the checks in main fails."""
 
     def __init__(self, msg, status_type=None):
