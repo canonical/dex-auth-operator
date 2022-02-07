@@ -137,20 +137,7 @@ class Operator(CharmBase):
 
     def get_manifest(self):
         # Handle ingress
-        ingress = None
-        try:
-            ingress = self._get_interface("ingress")
-            print(
-                "DEBUGGING ~ file: charm.py ~ line 142 ~ try get ingress interface",
-                ingress,
-            )
-        except CheckFailedError as check_failed:
-            print(
-                "DEBUGGING ~ file: charm.py ~ line 144 ~ check_failed to get ingress interface",
-                check_failed,
-            )
-            self.model.unit.status = check_failed.status
-            self.logger.info(str(check_failed.status))
+        ingress = self._get_interface("ingress")
 
         if ingress:
             for app_name, version in ingress.versions.items():
@@ -164,12 +151,7 @@ class Operator(CharmBase):
                 ingress.send_data(data, app_name)
 
         # Get OIDC client info
-        oidc = None
-        try:
-            oidc = self._get_interface("oidc-client")
-        except CheckFailedError as check_failed:
-            self.model.unit.status = check_failed.status
-            self.logger.info(str(check_failed.status))
+        oidc = self._get_interface("oidc-client")
 
         if oidc:
             oidc_client_info = list(oidc.get_data().values())
@@ -286,14 +268,16 @@ class Operator(CharmBase):
         # NoCompatibleVersionsListed:
         # https://github.com/canonical/serialized-data-interface/issues/26
         try:
-            print("DEBUGGING ~ file: charm.py ~ line 279 ~ _get_interface try")
-            interface = get_interface(self, interface_name)
-        except NoVersionsListed as err:
-            print(
-                "DEBUGGING ~ file: charm.py ~ line 282 ~ NoVersionsListed err caught",
-                err,
-            )
-            raise CheckFailedError(str(err), WaitingStatus)
+            try:
+                interface = get_interface(self, interface_name)
+            except NoVersionsListed as err:
+                raise CheckFailedError(str(err), WaitingStatus)
+        except CheckFailedError as err:
+            self.logger.debug("_get_interface ~ Checkfailederror catch")
+            self.model.unit.status = err.status
+            self.logger.info(str(err.status))
+            return None
+
         return interface
 
     @staticmethod
