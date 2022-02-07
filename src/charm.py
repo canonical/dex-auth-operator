@@ -159,7 +159,9 @@ class Operator(CharmBase):
         # Load config values as convenient variables
         connectors = yaml.safe_load(self.model.config["connectors"])
         port = self.model.config["port"]
-        public_url = self.model.config["public-url"]
+        public_url = self.model.config["public-url"].lower()
+        if not public_url.startswith(("http://", "https://")):
+            public_url = f"http://{public_url}"
         static_username = self.model.config["static-username"] or self.state.username
         static_password = self.model.config["static-password"] or self.state.password
         static_password = static_password.encode("utf-8")
