@@ -43,8 +43,7 @@ async def test_relations(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         [APP_NAME, oidc_gatekeeper, istio_pilot],
         status="active",
-        # TODO: https://github.com/canonical/dex-auth-operator/issues/37
-        # raise_on_blocked=True,
+        raise_on_blocked=True,
         raise_on_error=True,
         timeout=600,
     )
