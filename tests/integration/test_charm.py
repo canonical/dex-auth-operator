@@ -55,6 +55,10 @@ async def test_access_login_page(ops_test):
         timeout=600,
     )
 
-    url = f"http://{dex_ip}:5556/dex/auth?client_id={oidc_config['client-id']}&redirect_uri=%2Fauthservice%2Foidc%2Fcallback&response_type=code&scope={oidc_config['oidc-scopes'].replace(' ', '+')}&state="
+    url = (
+        f"http://{dex_ip}:5556/dex/auth?client_id={oidc_config['client-id']}"
+        f"&redirect_uri=%2Fauthservice%2Foidc%2Fcallback&response_type=code"
+        f"&scope={oidc_config['oidc-scopes'].replace(' ', '+')}&state="
+    )
     r = requests.get(url)
     assert r.status_code == 200
