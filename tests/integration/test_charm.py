@@ -54,9 +54,15 @@ async def test_access_login_page(ops_test):
     )
 
     status = await ops_test.model.get_status()
-    istio_gateway_ip = status["applications"][istio_gateway]["public-address"]
-    await ops_test.model.applications[dex].set_config({"public-url": istio_gateway_ip})
-    await ops_test.model.applications[oidc].set_config({"public-url": istio_gateway_ip})
+    istio_gateway_address = (
+        status["applications"][istio_gateway]["public-address"] + ".nip.io"
+    )
+    await ops_test.model.applications[dex].set_config(
+        {"public-url": istio_gateway_address}
+    )
+    await ops_test.model.applications[oidc].set_config(
+        {"public-url": istio_gateway_address}
+    )
 
     await ops_test.model.wait_for_idle(
         [dex, oidc, istio, istio_gateway],
@@ -69,7 +75,7 @@ async def test_access_login_page(ops_test):
     )
 
     url = (
-        f"http://{istio_gateway_ip}/dex/auth?client_id={oidc_config['client-id']}"
+        f"http://{istio_gateway_address}/dex/auth?client_id={oidc_config['client-id']}"
         f"&redirect_uri=%2Fauthservice%2Foidc%2Fcallback&response_type=code"
         f"&scope={oidc_config['oidc-scopes'].replace(' ', '+')}&state="
     )

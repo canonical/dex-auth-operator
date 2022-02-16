@@ -10,11 +10,11 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
+      - name: Check out code
+        uses: actions/checkout@v2
 
-    - run: pip install tox
-    - run: tox -vve lint
+      - run: pip install tox
+      - run: tox -vve lint
 
   unit-test:
     name: Unit
@@ -36,9 +36,10 @@ jobs:
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
-            provider: microk8s
-            channel: 1.21/stable
+          provider: microk8s
+          channel: 1.21/stable
 
+      - run: microk8s enable metallb:"10.64.140.43-10.64.140.49,192.168.0.105-192.168.0.111"
       # https://github.com/charmed-kubernetes/actions-operator/issues/27
       - run: sudo snap refresh charmcraft --channel latest/candidate
       - run: tox -e integration
