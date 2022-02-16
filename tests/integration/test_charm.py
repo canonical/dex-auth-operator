@@ -55,6 +55,7 @@ async def test_access_login_page(ops_test):
 
     status = await ops_test.model.get_status()
     istio_gateway_ip = status["applications"][istio_gateway]["public-address"]
+    await ops_test.model.applications[dex].set_config({"public-url": istio_gateway_ip})
     await ops_test.model.applications[oidc].set_config({"public-url": istio_gateway_ip})
 
     await ops_test.model.wait_for_idle(
