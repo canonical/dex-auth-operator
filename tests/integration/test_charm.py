@@ -42,10 +42,10 @@ async def test_access_login_page(ops_test):
     await ops_test.model.deploy(istio, channel="1.5/stable")
     await ops_test.model.deploy(istio_gateway, channel="1.5/stable", trust=True)
     await ops_test.model.add_relation(oidc, dex)
+    await ops_test.model.add_relation(istio, istio_gateway)
     await ops_test.model.add_relation(f"{istio}:ingress", f"{dex}:ingress")
     await ops_test.model.add_relation(f"{istio}:ingress", f"{oidc}:ingress")
     await ops_test.model.add_relation(f"{istio}:ingress-auth", f"{oidc}:ingress-auth")
-    await ops_test.model.add_relation(istio, istio_gateway)
 
     await ops_test.model.wait_for_idle(
         [dex, oidc, istio, istio_gateway],
