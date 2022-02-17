@@ -39,7 +39,8 @@ jobs:
           provider: microk8s
           channel: 1.21/stable
 
-      - run: sg microk8s -c 'microk8s enable metallb:"10.64.140.43-10.64.140.49,192.168.0.105-192.168.0.111"'
+      - run: sudo chown -f -R $USER $HOME/.kube/
+      - run: sg microk8s -c 'microk8s enable metallb:10.64.140.43-10.64.140.49'
       # https://github.com/charmed-kubernetes/actions-operator/issues/27
       - run: sudo snap refresh charmcraft --channel latest/candidate
       - run: tox -e integration
