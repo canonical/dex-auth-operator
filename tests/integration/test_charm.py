@@ -5,6 +5,7 @@ import yaml
 
 import pytest
 import requests
+from pytest_operator.plugin import OpsTest
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +47,20 @@ async def test_access_login_page(ops_test):
     await ops_test.model.add_relation(f"{istio}:ingress", f"{dex}:ingress")
     await ops_test.model.add_relation(f"{istio}:ingress", f"{oidc}:ingress")
     await ops_test.model.add_relation(f"{istio}:ingress-auth", f"{oidc}:ingress-auth")
+    await ops_test.run(
+        "kubectl",
+        "patch",
+        "role",
+        f"-n={ops_test.model_name}",
+        "istio-gateway-operator",
+        "-p",
+        (
+            '{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role",'
+            '"metadata":{"name":"istio-gateway-operator"},'
+            '"rules":[{"apiGroups":["*"],"resources":["*"],"verbs":["*"]}]}'
+        ),
+        fail_msg="kubectl patch failed: ",
+    )
 
     await ops_test.model.wait_for_idle(
         [dex, oidc, istio, istio_gateway],
