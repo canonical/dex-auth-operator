@@ -5,6 +5,9 @@ import yaml
 
 import pytest
 import requests
+from lightkube.core.client import Client
+from lightkube.resources.rbac_authorization_v1 import Role
+from lightkube.models.rbac_v1 import PolicyRule
 from pytest_operator.plugin import OpsTest
 
 log = logging.getLogger(__name__)
@@ -47,20 +50,23 @@ async def test_access_login_page(ops_test):
     await ops_test.model.add_relation(f"{istio}:ingress", f"{dex}:ingress")
     await ops_test.model.add_relation(f"{istio}:ingress", f"{oidc}:ingress")
     await ops_test.model.add_relation(f"{istio}:ingress-auth", f"{oidc}:ingress-auth")
-    await ops_test.run(
-        "kubectl",
-        "patch",
-        "role",
-        f"-n={ops_test.model_name}",
-        "istio-gateway-operator",
-        "-p",
-        (
-            '{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role",'
-            '"metadata":{"name":"istio-gateway-operator"},'
-            '"rules":[{"apiGroups":["*"],"resources":["*"],"verbs":["*"]}]}'
-        ),
-        fail_msg="kubectl patch failed: ",
+
+    await ops_test.model.wait_for_idle(
+        [istio_gateway],
+        status="waiting",
+        timeout=600,
     )
+
+    lightkube_client = Client()
+
+    istio_gateway_role_name = "istio-gateway-operator"
+
+    new_policy_rule = PolicyRule(verbs=["*"], apiGroups=["*"], resources=["*"])
+    this_role = lightkube_client.get(
+        Role, istio_gateway_role_name, namespace=ops_test.model_name
+    )
+    this_role.rules.append(new_policy_rule)
+    lightkube_client.patch(Role, istio_gateway_role_name, this_role)
 
     await ops_test.model.wait_for_idle(
         [dex, oidc, istio, istio_gateway],
