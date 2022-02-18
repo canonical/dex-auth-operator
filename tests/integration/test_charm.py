@@ -72,7 +72,7 @@ async def test_access_login_page(ops_test):
     await ops_test.model.wait_for_idle(
         [dex, oidc, istio, istio_gateway],
         status="active",
-        timeout=600,
+        timeout=700,
     )
 
     status = await ops_test.model.get_status()
