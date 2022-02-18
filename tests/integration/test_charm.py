@@ -96,5 +96,5 @@ async def test_access_login_page(ops_test):
         timeout=600,
     )
 
-    r = requests.get(istio_gateway_address)
+    r = requests.get(f"{istio_gateway_address}/dex")
     assert r.status_code == 200
