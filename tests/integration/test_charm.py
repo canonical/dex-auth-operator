@@ -67,7 +67,7 @@ async def test_access_login_page(ops_test):
     this_role.rules.append(new_policy_rule)
     lightkube_client.patch(Role, istio_gateway_role_name, this_role)
 
-    await ops_test.model.set_config({"update-status-hook-interval": "10s"})
+    await ops_test.model.set_config({"update-status-hook-interval": "1m"})
 
     await ops_test.model.wait_for_idle(
         [dex, oidc, istio, istio_gateway],
