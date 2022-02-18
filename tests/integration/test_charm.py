@@ -80,8 +80,8 @@ async def test_access_login_page(ops_test):
         # oidc transient errors when update public url
         # https://github.com/canonical/oidc-gatekeeper-operator/issues/21
         raise_on_error=False,
-        timeout=600,
+        timeout=1000,
     )
 
-    r = requests.get(f"{istio_gateway_address}/dex")
+    r = requests.get(f"{ISTIO_GATEWAY_ADDRESS}/dex")
     assert r.status_code == 200
