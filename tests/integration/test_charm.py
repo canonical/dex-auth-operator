@@ -6,6 +6,7 @@ import yaml
 import pytest
 import requests
 from lightkube.core.client import Client
+from lightkube.config.kubeconfig import KubeConfig
 from lightkube.resources.rbac_authorization_v1 import Role
 from lightkube.models.rbac_v1 import PolicyRule
 
@@ -61,6 +62,9 @@ async def test_access_login_page(ops_test):
     )
 
     lightkube_client = Client(
+        config=KubeConfig.from_file(
+            "/var/snap/microk8s/current/credentials/client.config"
+        ),
         namespace=ops_test.model_name,
     )
 
@@ -80,7 +84,7 @@ async def test_access_login_page(ops_test):
         # oidc transient errors when update public url
         # https://github.com/canonical/oidc-gatekeeper-operator/issues/21
         raise_on_error=False,
-        timeout=1000,
+        timeout=3000,
     )
 
     r = requests.get(f"{ISTIO_GATEWAY_ADDRESS}/dex")
