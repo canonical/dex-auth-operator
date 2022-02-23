@@ -83,5 +83,12 @@ async def test_access_login_page(ops_test):
         timeout=3000,
     )
 
-    r = requests.get(f"{ISTIO_GATEWAY_ADDRESS}/dex")
+    r = requests.get(
+        (
+            f"{ISTIO_GATEWAY_ADDRESS}/dex/auth?client_id={oidc_config['client-id']}"
+            "&redirect_uri=%2Fauthservice%2Foidc%2Fcallback&response_type=code"
+            f"&scope={oidc_config['oidc-scopes'].replace(' ', '+')}&state="
+        )
+    )
+
     assert r.status_code == 200
