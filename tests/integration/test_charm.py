@@ -13,6 +13,11 @@ log = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 ISTIO_GATEWAY_ADDRESS = "http://10.64.140.43.nip.io"
+DEX_CONFIG = {
+    "static-username": "admin",
+    "static-password": "foobar",
+    "public-url": ISTIO_GATEWAY_ADDRESS,
+}
 
 
 @pytest.mark.abort_on_fail
@@ -20,9 +25,7 @@ async def test_build_and_deploy(ops_test):
     my_charm = await ops_test.build_charm(".")
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     resources = {"oci-image": image_path}
-    await ops_test.model.deploy(
-        my_charm, resources=resources, config={"public-url": ISTIO_GATEWAY_ADDRESS}
-    )
+    await ops_test.model.deploy(my_charm, resources=resources, config=DEX_CONFIG)
     await ops_test.model.wait_for_idle()
 
 
