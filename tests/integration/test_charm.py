@@ -8,6 +8,7 @@ import requests
 from lightkube.core.client import Client
 from lightkube.resources.rbac_authorization_v1 import Role
 from lightkube.models.rbac_v1 import PolicyRule
+import time
 
 log = logging.getLogger(__name__)
 
@@ -83,8 +84,20 @@ async def test_access_login_page(ops_test):
         # oidc transient errors when update public url
         # https://github.com/canonical/oidc-gatekeeper-operator/issues/21
         raise_on_error=False,
-        timeout=3000,
+        timeout=3500,
     )
+
+    timer = 0
+    while timer < 3000:
+        checker = requests.get(
+            f"{ISTIO_GATEWAY_ADDRESS}/dex/.well-known/openid-configuration"
+        )
+
+        if checker.status_code == 200:
+            break
+        else:
+            time.sleep(10)
+            timer += 10
 
     r = requests.get(
         (
