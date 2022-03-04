@@ -40,9 +40,9 @@ jobs:
           channel: 1.21/stable
           bootstrap-options: --agent-version="2.9.22"
 
-      - run: sg microk8s -c 'microk8s enable metallb:10.64.140.43-10.64.140.49'
+      - run: sg microk8s -c 'microk8s enable ingress metallb:10.64.140.43-10.64.140.49'
       - run: sg microk8s -c 'sudo chown -f -R $USER ~/.kube'
-      - run: sudo cp /var/snap/microk8s/current/credentials/client.config $HOME/.kube/config
+      - run: sg microk8s -c "microk8s config > ~/.kube/config"
       # https://github.com/charmed-kubernetes/actions-operator/issues/27
       - run: sudo snap refresh charmcraft --channel latest/candidate
-      - run: tox -e integration
+      - run: sg microk8s -c "tox -e integration"
