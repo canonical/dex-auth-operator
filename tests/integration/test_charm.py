@@ -9,7 +9,6 @@ from lightkube.core.client import Client
 from lightkube.resources.rbac_authorization_v1 import Role
 from lightkube.models.rbac_v1 import PolicyRule
 import time
-from lightkube.config.kubeconfig import KubeConfig
 from pytest_operator.plugin import OpsTest
 
 log = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ DEX_CONFIG = {
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test):
+async def test_build_and_deploy(ops_test: OpsTest):
     my_charm = await ops_test.build_charm(".")
     image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     resources = {"oci-image": image_path}
@@ -38,8 +37,7 @@ async def test_status(ops_test):
 
 
 @pytest.mark.abort_on_fail
-async def test_access_login_page(ops_test):
-    # ops_test.keep_model = True
+async def test_access_login_page(ops_test: OpsTest):
     oidc = "oidc-gatekeeper"
     istio = "istio-pilot"
     istio_gateway = "istio-gateway"
@@ -68,12 +66,10 @@ async def test_access_login_page(ops_test):
     )
 
     lightkube_client = Client(
-        config=KubeConfig.from_file(
-            "/var/snap/microk8s/current/credentials/client.config"
-        ),
         namespace=ops_test.model_name,
     )
 
+    await ops_test.model.set_config({"update-status-hook-interval": "15s"})
     istio_gateway_role_name = "istio-gateway-operator"
 
     new_policy_rule = PolicyRule(verbs=["*"], apiGroups=["*"], resources=["*"])
@@ -81,7 +77,8 @@ async def test_access_login_page(ops_test):
     this_role.rules.append(new_policy_rule)
     lightkube_client.patch(Role, istio_gateway_role_name, this_role)
 
-    await ops_test.model.set_config({"update-status-hook-interval": "1m"})
+    time.sleep(50)
+    await ops_test.model.set_config({"update-status-hook-interval": "5m"})
 
     await ops_test.model.wait_for_idle(
         [dex, oidc, istio, istio_gateway],
@@ -93,24 +90,16 @@ async def test_access_login_page(ops_test):
         timeout=3500,
     )
 
-    timer = 0
-    while timer < 3000:
-        checker = requests.get(
-            f"{ISTIO_GATEWAY_ADDRESS}/dex/.well-known/openid-configuration"
-        )
-
-        if checker.status_code == 200:
-            break
-        else:
-            time.sleep(10)
-            timer += 10
-
-    r = requests.get(
-        (
-            f"{ISTIO_GATEWAY_ADDRESS}/dex/auth?client_id={oidc_config['client-id']}"
-            "&redirect_uri=%2Fauthservice%2Foidc%2Fcallback&response_type=code"
-            f"&scope={oidc_config['oidc-scopes'].replace(' ', '+')}&state="
-        )
+    url = (
+        f"{ISTIO_GATEWAY_ADDRESS}/dex/auth?client_id={oidc_config['client-id']}"
+        "&redirect_uri=%2Fauthservice%2Foidc%2Fcallback&response_type=code"
+        f"&scope={oidc_config['oidc-scopes'].replace(' ', '+')}&state="
     )
-
+    for _ in range(60):
+        try:
+            requests.get(url, timeout=60)
+            break
+        except requests.ConnectionError:
+            time.sleep(5)
+    r = requests.get(url)
     assert r.status_code == 200
