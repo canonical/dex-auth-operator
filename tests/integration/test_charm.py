@@ -98,7 +98,7 @@ async def test_access_login_page(ops_test: OpsTest):
         # oidc transient errors when update public url
         # https://github.com/canonical/oidc-gatekeeper-operator/issues/21
         raise_on_error=False,
-        timeout=1000,
+        timeout=3500,
     )
 
     url = f"{public_url}/dex"
