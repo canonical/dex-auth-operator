@@ -38,7 +38,6 @@ jobs:
         with:
           provider: microk8s
           channel: 1.21/stable
-          bootstrap-options: --agent-version="2.9.22"
 
       - run: sg microk8s -c 'microk8s enable ingress metallb:10.64.140.43-10.64.140.49'
       - run: sg microk8s -c 'sudo chown -f -R $USER ~/.kube'
