@@ -78,7 +78,7 @@ async def test_access_login_page(ops_test: OpsTest):
     await ops_test.model.set_config({"update-status-hook-interval": "5m"})
 
     await ops_test.model.wait_for_idle(
-        [istio, istio_gateway],
+        [dex, oidc, istio, istio_gateway],
         status="active",
         timeout=3500,
     )
@@ -98,7 +98,7 @@ async def test_access_login_page(ops_test: OpsTest):
         # oidc transient errors when update public url
         # https://github.com/canonical/oidc-gatekeeper-operator/issues/21
         raise_on_error=False,
-        timeout=3500,
+        timeout=600,
     )
 
     url = f"{public_url}/dex"
