@@ -47,7 +47,12 @@ async def test_access_login_page(ops_test: OpsTest):
         "client-secret": "oidc-client-secret",
         "oidc-scopes": "openid profile email groups",
     }
-    await ops_test.model.deploy(oidc, config=oidc_config)
+    # await ops_test.model.deploy(oidc, config=oidc_config)
+    await ops_test.model.deploy(
+        oidc,
+        channel="latest/edge",
+        config=oidc_config,
+    )
     await ops_test.model.deploy(istio, channel="1.5/stable")
     await ops_test.model.deploy(istio_gateway, channel="1.5/stable", trust=True)
     await ops_test.model.add_relation(oidc, dex)
@@ -94,10 +99,8 @@ async def test_access_login_page(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         [dex, oidc, istio, istio_gateway],
         status="active",
-        raise_on_blocked=False,
-        # oidc transient errors when update public url
-        # https://github.com/canonical/oidc-gatekeeper-operator/issues/21
-        raise_on_error=False,
+        raise_on_blocked=True,
+        raise_on_error=True,
         timeout=600,
     )
 
