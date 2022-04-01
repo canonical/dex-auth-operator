@@ -10,11 +10,11 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
+      - name: Check out code
+        uses: actions/checkout@v2
 
-    - run: pip install tox
-    - run: tox -vve lint
+      - run: pip install tox
+      - run: tox -vve lint
 
   unit-test:
     name: Unit
@@ -36,9 +36,12 @@ jobs:
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
-            provider: microk8s
-            channel: 1.21/stable
+          provider: microk8s
+          channel: 1.21/stable
 
+      - run: sg microk8s -c 'microk8s enable ingress metallb:10.64.140.43-10.64.140.49'
+      - run: sg microk8s -c 'sudo chown -f -R $USER ~/.kube'
+      - run: sg microk8s -c "microk8s config > ~/.kube/config"
       # https://github.com/charmed-kubernetes/actions-operator/issues/27
       - run: sudo snap refresh charmcraft --channel latest/candidate
-      - run: tox -e integration
+      - run: sg microk8s -c "tox -e integration"
