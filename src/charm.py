@@ -14,6 +14,8 @@ from string import ascii_letters
 from uuid import uuid4
 
 import yaml
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube import ApiError, Client, codecs
 from lightkube.resources.apps_v1 import StatefulSet, Deployment
 from ops.charm import CharmBase
@@ -37,6 +39,10 @@ except ImportError:
     import bcrypt
 
 
+METRICS_PATH = "/metrics"
+METRICS_PORT = "5558"
+
+
 def only_leader(handler):
     """Ensures method only runs if unit is a leader."""
 
@@ -58,6 +64,22 @@ class Operator(CharmBase):
         super().__init__(*args)
 
         self.logger: logging.Logger = logging.getLogger(__name__)
+
+        self.prometheus_provider = MetricsEndpointProvider(
+            charm=self,
+            relation_name="metrics-endpoint",
+            jobs=[
+                {
+                    "metrics_path": METRICS_PATH,
+                    "static_configs": [{"targets": ["*:{}".format(METRICS_PORT)]}],
+                }
+            ],
+        )
+
+        self.dashboard_provider = GrafanaDashboardProvider(
+            charm=self,
+            relation_name="grafana-dashboards",
+        )
 
         for event in [
             self.on.install,
