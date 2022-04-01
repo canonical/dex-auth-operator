@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 bcrypt<3.3
-black==20.8b1
+black
 flake8<4.1
 flake8-copyright<0.3
 juju<2.10
