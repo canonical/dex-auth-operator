@@ -166,7 +166,7 @@ class Operator(CharmBase):
                 data = {
                     "prefix": "/dex",
                     "rewrite": "/dex",
-                    "service": self.model.app.name,
+                    "service": self.model.app.name + "-charm",
                     "port": self.model.config["port"],
                 }
 
