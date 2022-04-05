@@ -103,6 +103,12 @@ class Operator(CharmBase):
             self.model.unit.status = BlockedStatus(str(err))
             return
 
+        # Tries to remove the original resources
+        try:
+            self.remove(event)
+        except Exception as err:
+            pass
+
         self.model.unit.status = MaintenanceStatus("Applying manifests")
         errors = self.set_manifest(manifest)
 
