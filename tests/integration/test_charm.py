@@ -62,7 +62,6 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
     await ops_test.model.deploy(grafana, channel="latest/beta")
     await ops_test.model.add_relation(prometheus, grafana)
     await ops_test.model.add_relation(APP_NAME, grafana)
-    await ops_test.model.add_relation(prometheus, APP_NAME)
     await ops_test.model.deploy(
         prometheus_scrape_charm,
         channel="latest/beta",
