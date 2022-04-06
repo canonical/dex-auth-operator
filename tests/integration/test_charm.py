@@ -91,7 +91,8 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
         ):
             with attempt:
                 r = requests.get(
-                    f'http://{prometheus_unit_ip}:9090/api/v1/query?query=up{{juju_application="{APP_NAME}"}}'
+                    f'http://{prometheus_unit_ip}:9090/api/v1/query?'
+                    f'query=up{{juju_application="{APP_NAME}"}}'
                 )
                 response = json.loads(r.content.decode("utf-8"))
                 response_status = response["status"]
