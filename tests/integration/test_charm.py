@@ -11,7 +11,6 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import (
     Retrying,
-    RetryError,
     stop_after_attempt,
     stop_after_delay,
     wait_exponential,
@@ -83,24 +82,29 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
     ]
     log.info(f"Prometheus available at http://{prometheus_unit_ip}:9090")
 
-    try:
-        for attempt in Retrying(
-            (stop_after_attempt(5) | stop_after_delay(30)),
-            wait=wait_exponential(multiplier=1, min=1, max=10),
-            reraise=True,
-        ):
-            with attempt:
-                r = requests.get(
-                    f'http://{prometheus_unit_ip}:9090/api/v1/query?'
-                    f'query=up{{juju_application="{APP_NAME}"}}'
-                )
-                response = json.loads(r.content.decode("utf-8"))
-                response_status = response["status"]
-                log.info(f"Response status is {response_status}")
-                assert response_status == "success"
+    for attempt in retry_for_5_attempts:
+        log.info(
+            f"Testing prometheus deployment (attempt "
+            f"{attempt.retry_state.attempt_number})"
+        )
+        with attempt:
+            r = requests.get(
+                f'http://{prometheus_unit_ip}:9090/api/v1/query?'
+                f'query=up{{juju_application="{APP_NAME}"}}'
+            )
+            response = json.loads(r.content.decode("utf-8"))
+            response_status = response["status"]
+            log.info(f"Response status is {response_status}")
+            assert response_status == "success"
 
-                response_metric = response["data"]["result"][0]["metric"]
-                assert response_metric["juju_application"] == APP_NAME
-                assert response_metric["juju_model"] == ops_test.model_name
-    except RetryError:
-        log.info("Testing prometheus failed")
+            response_metric = response["data"]["result"][0]["metric"]
+            assert response_metric["juju_application"] == APP_NAME
+            assert response_metric["juju_model"] == ops_test.model_name
+
+
+# Helper to retry calling a function over 30 seconds or 5 attempts
+retry_for_5_attempts = Retrying(
+    stop=(stop_after_attempt(5) | stop_after_delay(30)),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    reraise=True,
+)
