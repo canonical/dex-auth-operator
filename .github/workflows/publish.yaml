@@ -72,6 +72,8 @@ jobs:
       - unit-test
       - integration-test
     runs-on: ubuntu-latest
+    # Only publish to charmhub if we are pushing to a special branch or running PRs from something named `branch/*`
+    if: (github.event_name == 'push') ||  (startsWith( github.head_ref, 'branch/' ))
     steps:
       - name: Checkout
         uses: actions/checkout@v2
