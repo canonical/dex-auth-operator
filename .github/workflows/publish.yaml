@@ -1,79 +1,13 @@
 name: Publish
 
 on:
-  push:
-    branches:
-      - master
-      - main
-      - track/**
-  pull_request:
-    branches:
-      - master
-      - main
-      - track/**
+  workflow_call:
 
 jobs:
-  lib-check:
-    name: Check libraries
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Check libs
-        uses: canonical/charming-actions/check-libraries@1.0.3
-        with:
-          credentials: "${{ secrets.CHARMCRAFT_CREDENTIALS }}"
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-
-    - run: pip install tox
-    - run: tox -vve lint
-
-  unit-test:
-    name: Unit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-
-      - run: pip install tox
-      - run: tox -e unit
-
-  integration-test:
-    name: Integration
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-            provider: microk8s
-            channel: 1.21/stable
-
-      # https://github.com/charmed-kubernetes/actions-operator/issues/27
-      - run: sudo snap refresh charmcraft --channel latest/candidate
-      - run: tox -e integration
 
   publish-charm:
     name: Publish Charm
-    needs:
-      - lib-check
-      - lint
-      - unit-test
-      - integration-test
     runs-on: ubuntu-latest
-    # Only publish to charmhub if we are pushing to a special branch or running PRs from something named `branch/*`
-    if: (github.event_name == 'push') ||  (startsWith( github.head_ref, 'branch/' ))
     steps:
       - name: Checkout
         uses: actions/checkout@v2
