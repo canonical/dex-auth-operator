@@ -19,9 +19,13 @@ jobs:
   tests:
     name: Run Tests
     uses: ./.github/workflows/integration.yaml
+    secrets:
+      credentials: "${{ secrets.CHARMCRAFT_CREDENTIALS }}"
 
   # publish runs in series with tests, and only publishes if tests passes
   publish-charm:
     name: Publish Charm
     needs: tests
     uses: ./.github/workflows/publish.yaml
+    secrets:
+      credentials: "${{ secrets.CHARMCRAFT_CREDENTIALS }}"
