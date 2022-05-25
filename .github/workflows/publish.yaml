@@ -3,7 +3,7 @@ name: Publish
 on:
   workflow_call:
     secrets:
-      credentials:
+      charmcraft-credentials:
         required: true
 
 jobs:
@@ -22,6 +22,6 @@ jobs:
       - name: Upload charm to charmhub
         uses: canonical/charming-actions/upload-charm@1.0.3
         with:
-          credentials: "${{ secrets.credentials }}"
+          credentials: "${{ secrets.charmcraft-credentials }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
           channel: "${{ steps.channel.outputs.name }}"
