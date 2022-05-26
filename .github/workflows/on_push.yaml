@@ -18,7 +18,7 @@ jobs:
 
   tests:
     name: Run Tests
-    uses: ./.github/workflows/reusable_workflows/integration.yaml
+    uses: ./.github/workflows/integration.yaml
     secrets:
       charmcraft-credentials: "${{ secrets.CHARMCRAFT_CREDENTIALS }}"
 
@@ -26,6 +26,6 @@ jobs:
   publish-charm:
     name: Publish Charm
     needs: tests
-    uses: ./.github/workflows/reusable_workflows/publish.yaml
+    uses: ./.github/workflows/publish.yaml
     secrets:
       charmcraft-credentials: "${{ secrets.CHARMCRAFT_CREDENTIALS }}"
