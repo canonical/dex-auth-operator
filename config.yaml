@@ -24,3 +24,7 @@ options:
     type: string
     default: ''
     description: Static password for logging in without an external auth service
+  image:
+    type: string
+    description: The docker image to install. Required.
+    default: 'ghcr.io/dexidp/dex:v2.28.1'

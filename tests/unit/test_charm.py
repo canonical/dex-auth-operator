@@ -69,6 +69,7 @@ def test_main_no_relation(
         "name": "dex-auth",
         "namespace": None,
         "port": 5556,
+        "image": "ghcr.io/dexidp/dex:v2.28.1",
         "config_yaml": json.dumps(config_yaml),
         "config_hash": "de746b7609029af76f80a7daa43df83121715d1434baf13a36b32b02220b01b9",
     }
@@ -139,6 +140,7 @@ def test_main_oidc(mock_client, mock_codecs, mock_check_deployed_resources, harn
         "name": "dex-auth",
         "namespace": None,
         "port": 5556,
+        "image": "ghcr.io/dexidp/dex:v2.28.1",
         "config_yaml": json.dumps(config_yaml),
         "config_hash": "1169f8e7519f64a078398503f8d783973013c5931cab07990d5ee4b2faba5b07",
     }
@@ -200,6 +202,7 @@ def test_main_ingress(mock_client, mock_codecs, mock_check_deployed_resources, h
         "name": "dex-auth",
         "namespace": None,
         "port": 5556,
+        "image": "ghcr.io/dexidp/dex:v2.28.1",
         "config_yaml": json.dumps(config_yaml),
         "config_hash": "de746b7609029af76f80a7daa43df83121715d1434baf13a36b32b02220b01b9",
     }

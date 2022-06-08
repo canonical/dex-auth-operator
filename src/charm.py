@@ -223,6 +223,7 @@ class Operator(CharmBase):
             "name": self.model.app.name.replace("-operator", ""),
             "namespace": self.model.name,
             "port": self.model.config["port"],
+            "image": self.model.config["image"],
             "config_yaml": config,
             "config_hash": config_hash.hexdigest(),
         }

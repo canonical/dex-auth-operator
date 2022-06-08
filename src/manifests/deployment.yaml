@@ -17,7 +17,7 @@ spec:
     spec:
       serviceAccountName: {{ name }}-charm
       containers:
-      - image: quay.io/dexidp/dex:v2.22.0
+      - image: {{ image }}
         name: dex
         command: ["dex", "serve", "/etc/dex/cfg/config.yaml"]
         ports:
