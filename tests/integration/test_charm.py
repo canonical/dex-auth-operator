@@ -8,6 +8,8 @@ from pathlib import Path
 import pytest
 import requests
 import yaml
+import lightkube
+from lightkube.resources.apps_v1 import StatefulSet
 from pytest_operator.plugin import OpsTest
 from tenacity import (
     Retrying,
@@ -32,7 +34,13 @@ OIDC_CONFIG = {
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test):
     my_charm = await ops_test.build_charm(".")
-    await ops_test.model.deploy(my_charm, trust=True, config=DEX_CONFIG)
+    dex_image_path = METADATA["resources"]["dex-auth-image"]["upstream-source"]
+    await ops_test.model.deploy(
+        my_charm,
+        resources={"dex-auth-image": dex_image_path},
+        trust=True,
+        config=DEX_CONFIG
+    )
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=600
     )
@@ -40,11 +48,31 @@ async def test_build_and_deploy(ops_test):
 
 
 @pytest.mark.abort_on_fail
+def test_statefulset_readiness(ops_test: OpsTest):
+    lightkube_client = lightkube.Client()
+    statefulset = lightkube_client.get(
+        StatefulSet, APP_NAME, namespace=ops_test.model_name
+    )
+
+    expected_replicas = statefulset.spec.replicas
+    ready_replicas = statefulset.status.readyReplicas
+
+    assert expected_replicas == ready_replicas
+
+
+@pytest.mark.abort_on_fail
 async def test_relations(ops_test: OpsTest):
     oidc_gatekeeper = "oidc-gatekeeper"
     istio_pilot = "istio-pilot"
     await ops_test.model.deploy(oidc_gatekeeper, config=OIDC_CONFIG)
-    await ops_test.model.deploy(istio_pilot, channel="1.5/stable")
+    await ops_test.model.deploy(
+        entity_url="istio-pilot",
+        # TODO: Change to latest/edge
+        #  once https://github.com/juju/python-libjuju/issues/684 is fixed
+        channel="1.5/stable",
+        config={"default-gateway": "kubeflow-gateway"},
+        trust=True,
+    )
     await ops_test.model.add_relation(oidc_gatekeeper, APP_NAME)
     await ops_test.model.add_relation(f"{istio_pilot}:ingress", f"{APP_NAME}:ingress")
 
