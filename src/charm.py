@@ -33,20 +33,6 @@ METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
 
 
-def only_leader(handler):
-    """Ensures method only runs if unit is a leader."""
-
-    @wraps(handler)
-    def wrapper(self, event):
-        if not self.unit.is_leader():
-            # We can't do anything useful when not the leader, so do nothing.
-            self.model.unit.status = WaitingStatus("Waiting for leadership")
-        else:
-            handler(self, event)
-
-    return wrapper
-
-
 class Operator(CharmBase):
     state = StoredState()
 
@@ -80,6 +66,7 @@ class Operator(CharmBase):
 
         for event in [
             self.on.install,
+            self.on.leader_elected,
             self.on.upgrade_charm,
             self.on.config_changed,
             self.on.oidc_client_relation_changed,
@@ -175,10 +162,15 @@ class Operator(CharmBase):
             self._container.push(self._dex_config_path, config, make_dirs=True)
             self.logger.info("Updated dex config")
 
-        self._container.restart(self._container_name)
+        self._container.replan()
 
-    @only_leader
     def main(self, event):
+        try:
+            self._check_leader()
+        except CheckFailedError as err:
+            self.model.unit.status = err.status
+            return
+
         self.model.unit.status = MaintenanceStatus("Configuring dex charm")
         self.ensure_state()
 
@@ -213,6 +205,11 @@ class Operator(CharmBase):
                 }
 
                 ingress.send_data(data, app_name)
+
+    def _check_leader(self):
+        if not self.unit.is_leader():
+            # We can't do anything useful when not the leader, so do nothing.
+            raise CheckFailedError("Waiting for leadership", WaitingStatus)
 
     def _get_interface(self, interface_name):
         # Remove this abstraction when SDI adds .status attribute to NoVersionsListed,

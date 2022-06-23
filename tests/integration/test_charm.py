@@ -50,14 +50,20 @@ async def test_build_and_deploy(ops_test):
 @pytest.mark.abort_on_fail
 def test_statefulset_readiness(ops_test: OpsTest):
     lightkube_client = lightkube.Client()
-    statefulset = lightkube_client.get(
-        StatefulSet, APP_NAME, namespace=ops_test.model_name
-    )
+    for attempt in retry_for_5_attempts:
+        log.info(
+            f"Waiting for StatefulSet replica(s) to be ready"
+            f"(attempt {attempt.retry_state.attempt_number})"
+        )
+        with attempt:
+            statefulset = lightkube_client.get(
+                StatefulSet, APP_NAME, namespace=ops_test.model_name
+            )
 
-    expected_replicas = statefulset.spec.replicas
-    ready_replicas = statefulset.status.readyReplicas
+            expected_replicas = statefulset.spec.replicas
+            ready_replicas = statefulset.status.readyReplicas
 
-    assert expected_replicas == ready_replicas
+            assert expected_replicas == ready_replicas
 
 
 @pytest.mark.abort_on_fail
@@ -133,6 +139,6 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
 # Helper to retry calling a function over 30 seconds or 5 attempts
 retry_for_5_attempts = Retrying(
     stop=(stop_after_attempt(5) | stop_after_delay(30)),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
+    wait=wait_exponential(multiplier=1, min=5, max=10),
     reraise=True,
 )
