@@ -161,6 +161,7 @@ class Operator(CharmBase):
             self._container.push(self._dex_config_path, config, make_dirs=True)
             self.logger.info("Updated dex config")
 
+        # Using restart due to https://github.com/canonical/dex-auth-operator/issues/63
         self._container.restart(self._container_name)
 
     def main(self, event):

@@ -34,7 +34,7 @@ OIDC_CONFIG = {
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test):
     my_charm = await ops_test.build_charm(".")
-    dex_image_path = METADATA["resources"]["dex-auth-image"]["upstream-source"]
+    dex_image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     await ops_test.model.deploy(
         my_charm,
         resources={"dex-auth-image": dex_image_path},
