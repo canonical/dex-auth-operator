@@ -72,7 +72,7 @@ async def test_relations(ops_test: OpsTest):
     istio_pilot = "istio-pilot"
     await ops_test.model.deploy(oidc_gatekeeper, config=OIDC_CONFIG)
     await ops_test.model.deploy(
-        entity_url="istio-pilot",
+        entity_url=istio_pilot,
         # TODO: Change to latest/edge
         #  once https://github.com/juju/python-libjuju/issues/684 is fixed
         channel="1.5/stable",

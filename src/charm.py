@@ -98,7 +98,7 @@ class Operator(CharmBase):
     def _update_layer(self) -> None:
         """Updates the Pebble configuration layer if changed."""
         if not self._container.can_connect():
-            self.unit.status = MaintenanceStatus("Waiting for pod startup to complete")
+            self.unit.status = WaitingStatus("Waiting for pod startup to complete")
             return
 
         # Get OIDC client info
@@ -161,7 +161,7 @@ class Operator(CharmBase):
             self._container.push(self._dex_config_path, config, make_dirs=True)
             self.logger.info("Updated dex config")
 
-        self._container.replan()
+        self._container.restart(self._container_name)
 
     def main(self, event):
         try:
