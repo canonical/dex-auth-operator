@@ -20,9 +20,9 @@ provides:
     interface: grafana_dashboard
 containers:
   dex:
-    resource: dex-auth-image
+    resource: oci-image
 resources:
-  dex-auth-image:
+  oci-image:
     type: oci-image
     description: OCI image for dex container
     upstream-source: dexidp/dex:v2.31.2
