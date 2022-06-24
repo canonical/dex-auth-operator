@@ -37,7 +37,7 @@ async def test_build_and_deploy(ops_test):
     dex_image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     await ops_test.model.deploy(
         my_charm,
-        resources={"dex-auth-image": dex_image_path},
+        resources={"oci-image": dex_image_path},
         trust=True,
         config=DEX_CONFIG
     )
