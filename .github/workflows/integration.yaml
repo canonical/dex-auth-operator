@@ -59,4 +59,24 @@ jobs:
 
       # https://github.com/charmed-kubernetes/actions-operator/issues/27
       - run: sudo snap refresh charmcraft --channel latest/candidate
-      - run: tox -e integration
+
+      - name: Run test
+        run: |
+          # Requires the model to be called kubeflow due to this bug:
+          # https://github.com/kubeflow/kubeflow/issues/6136
+          juju add-model kubeflow
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt install ./google-chrome-stable_current_amd64.deb
+          sudo apt-get install chromium-chromedriver
+          sg microk8s -c "tox -e integration -- --model kubeflow"
+
+      - name: Get istio gateway
+        run: kubectl get gateway -A
+        if: failure()
+
+      - name: Upload selenium screenshots
+        uses: actions/upload-artifact@v2
+        with:
+          name: selenium-screenshots
+          path: /tmp/selenium-*.png
+        if: failure()
