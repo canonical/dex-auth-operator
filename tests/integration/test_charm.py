@@ -10,7 +10,14 @@ import requests
 import yaml
 import lightkube
 from lightkube.resources.apps_v1 import StatefulSet
+from lightkube.resources.core_v1 import Service
 from pytest_operator.plugin import OpsTest
+from selenium import webdriver
+from selenium.common.exceptions import JavascriptException, WebDriverException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from time import sleep
 from tenacity import (
     Retrying,
     stop_after_attempt,
@@ -73,22 +80,93 @@ async def test_relations(ops_test: OpsTest):
     await ops_test.model.deploy(oidc_gatekeeper, config=OIDC_CONFIG)
     await ops_test.model.deploy(
         entity_url=istio_pilot,
-        # TODO: Change to latest/edge
-        #  once https://github.com/juju/python-libjuju/issues/684 is fixed
-        channel="1.5/stable",
+        channel="latest/edge",
         config={"default-gateway": "kubeflow-gateway"},
         trust=True,
     )
     await ops_test.model.add_relation(oidc_gatekeeper, APP_NAME)
     await ops_test.model.add_relation(f"{istio_pilot}:ingress", f"{APP_NAME}:ingress")
 
+    await ops_test.model.deploy(
+        entity_url="istio-gateway",
+        application_name="istio-ingressgateway",
+        channel="latest/edge",
+        config={"kind": "ingress"},
+        trust=True,
+    )
+    await ops_test.model.add_relation(
+        istio_pilot,
+        "istio-ingressgateway",
+    )
+
+    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge")
+    await ops_test.model.deploy("kubeflow-dashboard", channel="latest/edge")
+    await ops_test.model.add_relation("kubeflow-profiles", "kubeflow-dashboard")
+    await ops_test.model.add_relation("istio-pilot:ingress", "kubeflow-dashboard:ingress")
+
     await ops_test.model.wait_for_idle(
-        [APP_NAME, oidc_gatekeeper, istio_pilot],
         status="active",
-        raise_on_blocked=True,
+        raise_on_blocked=False,
         raise_on_error=True,
         timeout=600,
     )
+
+
+@pytest.fixture()
+async def driver(request, ops_test: OpsTest):
+    lightkube_client = lightkube.Client()
+    gateway_svc = lightkube_client.get(
+        Service, "istio-ingressgateway-workload", namespace=ops_test.model_name
+    )
+
+    endpoint = gateway_svc.status.loadBalancer.ingress[0].ip
+    url = f"http://{endpoint}.nip.io"
+
+    await ops_test.model.applications[APP_NAME].set_config({"public-url": url})
+    await ops_test.model.applications["oidc-gatekeeper"].set_config({"public-url": url})
+
+    options = Options()
+    options.headless = True
+    options.incognito = True
+
+    with webdriver.Chrome(options=options) as driver:
+        driver.delete_all_cookies()
+        wait = WebDriverWait(driver, 180, 1, (JavascriptException, StopIteration))
+        for _ in range(60):
+            try:
+                driver.get(url)
+                break
+            except WebDriverException:
+                sleep(5)
+        else:
+            driver.get(url)
+
+        yield driver, wait, url
+
+        driver.get_screenshot_as_file(f"/tmp/selenium-{request.node.name}.png")
+
+
+def fix_queryselector(elems):
+    selectors = '").shadowRoot.querySelector("'.join(elems)
+    return 'return document.querySelector("' + selectors + '")'
+
+
+def test_login(driver):
+    driver, wait, url = driver
+
+    # Log in using dex credentials
+    driver.find_element(By.ID, "login").send_keys(DEX_CONFIG["static-username"])
+    driver.find_element(By.ID, "password").send_keys(DEX_CONFIG["static-password"])
+    driver.find_element(By.ID, "submit-login").click()
+
+    # Check if main page was loaded
+    script = fix_queryselector(['main-page', 'dashboard-view', '#Quick-Links'])
+    wait.until(lambda x: x.execute_script(script))
+
+    # Check if an example sidebar link is present
+    example_link = "/volumes"
+    script = fix_queryselector(["main-page", f"iframe-link[href='{example_link}']"])
+    wait.until(lambda x: x.execute_script(script))
 
 
 async def test_prometheus_grafana_integration(ops_test: OpsTest):

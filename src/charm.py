@@ -16,7 +16,7 @@ from ops.pebble import Layer
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 from serialized_data_interface import get_interface, NoVersionsListed
 
 
@@ -97,8 +97,10 @@ class Operator(CharmBase):
 
     def _update_layer(self) -> None:
         """Updates the Pebble configuration layer if changed."""
-        if not self._container.can_connect():
-            self.unit.status = WaitingStatus("Waiting for pod startup to complete")
+        try:
+            self._check_container_connection()
+        except CheckFailedError as err:
+            self.model.unit.status = err.status
             return
 
         # Get OIDC client info
@@ -176,11 +178,7 @@ class Operator(CharmBase):
 
         self._update_layer()
 
-        try:
-            self.handle_ingress()
-        except Exception as err:
-            self.model.unit.status = BlockedStatus(str(err))
-            return
+        self.handle_ingress()
 
         self.model.unit.status = ActiveStatus()
 
@@ -211,6 +209,10 @@ class Operator(CharmBase):
             # We can't do anything useful when not the leader, so do nothing.
             raise CheckFailedError("Waiting for leadership", WaitingStatus)
 
+    def _check_container_connection(self):
+        if not self._container.can_connect():
+            raise CheckFailedError("Waiting for pod startup to complete", WaitingStatus)
+
     def _get_interface(self, interface_name):
         # Remove this abstraction when SDI adds .status attribute to NoVersionsListed,
         # NoCompatibleVersionsListed:
@@ -224,7 +226,7 @@ class Operator(CharmBase):
             self.logger.debug("_get_interface ~ Checkfailederror catch")
             self.model.unit.status = err.status
             self.logger.info(str(err.status))
-            return None
+            return
 
         return interface
 

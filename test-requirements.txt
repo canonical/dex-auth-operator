@@ -1,12 +1,14 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+git+https://github.com/juju/python-libjuju.git
 bcrypt<3.3
 black
 flake8<4.1
 flake8-copyright<0.3
-juju<2.10
 pytest<6.3
 pyyaml<6.1
 pytest-mock
+selenium
+selenium-wire
 tenacity<9
