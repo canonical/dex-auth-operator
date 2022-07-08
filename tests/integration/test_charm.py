@@ -113,7 +113,7 @@ async def test_relations(ops_test: OpsTest):
 
 
 @pytest.fixture()
-async def driver(request, ops_test: OpsTest):
+async def driver(ops_test: OpsTest):
     lightkube_client = lightkube.Client()
     gateway_svc = lightkube_client.get(
         Service, "istio-ingressgateway-workload", namespace=ops_test.model_name
@@ -127,6 +127,7 @@ async def driver(request, ops_test: OpsTest):
 
     # Oidc may get blocked and recreate the unit
     await ops_test.model.wait_for_idle(
+        [APP_NAME, "oidc-gatekeeper"],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -151,7 +152,7 @@ async def driver(request, ops_test: OpsTest):
 
         yield driver, wait, url
 
-        driver.get_screenshot_as_file(f"/tmp/selenium-{request.node.name}.png")
+        driver.get_screenshot_as_file("/tmp/selenium-dashboard.png")
 
 
 def fix_queryselector(elems):
@@ -162,6 +163,7 @@ def fix_queryselector(elems):
 def test_login(driver):
     driver, wait, url = driver
 
+    driver.get_screenshot_as_file("/tmp/selenium-logon.png")
     # Log in using dex credentials
     driver.find_element(By.ID, "login").send_keys(DEX_CONFIG["static-username"])
     driver.find_element(By.ID, "password").send_keys(DEX_CONFIG["static-password"])
@@ -169,11 +171,6 @@ def test_login(driver):
 
     # Check if main page was loaded
     script = fix_queryselector(['main-page', 'dashboard-view', '#Quick-Links'])
-    wait.until(lambda x: x.execute_script(script))
-
-    # Check if an example sidebar link is present
-    example_link = "/volumes"
-    script = fix_queryselector(["main-page", f"iframe-link[href='{example_link}']"])
     wait.until(lambda x: x.execute_script(script))
 
 

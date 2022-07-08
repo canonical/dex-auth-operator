@@ -76,7 +76,23 @@ jobs:
         if: failure()
 
       - name: Get juju status
-        run: juju status
+        run: juju status --relations
+        if: failure()
+
+      - name: Get oidc-gatekeeper workload logs
+        run: kubectl logs --tail 100 -nkubeflow -ljuju-app=oidc-gatekeeper
+        if: failure()
+
+      - name: Get oidc-gatekeeper operator logs
+        run: kubectl logs --tail 100 -nkubeflow -ljuju-operator=oidc-gatekeeper
+        if: failure()
+
+      - name: Get dex-auth workload logs
+        run: kubectl logs --tail 100 -nkubeflow -ljuju-app=dex-auth
+        if: failure()
+
+      - name: Get dex-auth operator logs
+        run: kubectl logs --tail 100 -nkubeflow -ljuju-operator=dex-auth
         if: failure()
 
       - name: Upload selenium screenshots
