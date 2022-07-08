@@ -125,6 +125,14 @@ async def driver(request, ops_test: OpsTest):
     await ops_test.model.applications[APP_NAME].set_config({"public-url": url})
     await ops_test.model.applications["oidc-gatekeeper"].set_config({"public-url": url})
 
+    # Oidc may get blocked and recreate the unit
+    await ops_test.model.wait_for_idle(
+        status="active",
+        raise_on_blocked=False,
+        raise_on_error=False,
+        timeout=600,
+    )
+
     options = Options()
     options.headless = True
     options.incognito = True
