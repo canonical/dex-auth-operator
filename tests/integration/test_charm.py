@@ -77,7 +77,7 @@ def test_statefulset_readiness(ops_test: OpsTest):
 async def test_relations(ops_test: OpsTest):
     oidc_gatekeeper = "oidc-gatekeeper"
     istio_pilot = "istio-pilot"
-    await ops_test.model.deploy(oidc_gatekeeper, config=OIDC_CONFIG)
+    await ops_test.model.deploy(oidc_gatekeeper, channel="ckf-1.4/stable", config=OIDC_CONFIG)
     await ops_test.model.deploy(
         entity_url=istio_pilot,
         channel="latest/edge",
