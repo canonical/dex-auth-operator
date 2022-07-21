@@ -75,6 +75,10 @@ jobs:
         run: kubectl get gateway -A
         if: failure()
 
+      - name: Get virtual services
+        run: kubectl get virtualservices -A
+        if: failure()
+
       - name: Get juju status
         run: juju status --relations
         if: failure()

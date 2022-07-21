@@ -77,32 +77,42 @@ def test_statefulset_readiness(ops_test: OpsTest):
 async def test_relations(ops_test: OpsTest):
     oidc_gatekeeper = "oidc-gatekeeper"
     istio_pilot = "istio-pilot"
-    await ops_test.model.deploy(oidc_gatekeeper, channel="ckf-1.4/stable", config=OIDC_CONFIG)
+    istio_gateway = "istio-ingressgateway"
+
     await ops_test.model.deploy(
         entity_url=istio_pilot,
         channel="latest/edge",
         config={"default-gateway": "kubeflow-gateway"},
         trust=True,
     )
-    await ops_test.model.add_relation(oidc_gatekeeper, APP_NAME)
-    await ops_test.model.add_relation(f"{istio_pilot}:ingress", f"{APP_NAME}:ingress")
 
     await ops_test.model.deploy(
         entity_url="istio-gateway",
-        application_name="istio-ingressgateway",
+        application_name=istio_gateway,
         channel="latest/edge",
         config={"kind": "ingress"},
         trust=True,
     )
     await ops_test.model.add_relation(
         istio_pilot,
-        "istio-ingressgateway",
+        istio_gateway,
     )
+
+    await ops_test.model.wait_for_idle(
+        [istio_pilot, istio_gateway],
+        raise_on_blocked=False,
+        status="active",
+        timeout=90 * 10,
+    )
+
+    await ops_test.model.deploy(oidc_gatekeeper, channel="ckf-1.4/stable", config=OIDC_CONFIG)
+    await ops_test.model.add_relation(oidc_gatekeeper, APP_NAME)
+    await ops_test.model.add_relation(f"{istio_pilot}:ingress", f"{APP_NAME}:ingress")
 
     await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge")
     await ops_test.model.deploy("kubeflow-dashboard", channel="latest/edge")
     await ops_test.model.add_relation("kubeflow-profiles", "kubeflow-dashboard")
-    await ops_test.model.add_relation("istio-pilot:ingress", "kubeflow-dashboard:ingress")
+    await ops_test.model.add_relation(f"{istio_pilot}:ingress", "kubeflow-dashboard:ingress")
 
     await ops_test.model.wait_for_idle(
         status="active",
