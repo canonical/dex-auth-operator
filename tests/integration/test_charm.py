@@ -146,7 +146,6 @@ async def driver(ops_test: OpsTest):
 
     options = Options()
     options.headless = True
-    options.incognito = True
 
     with webdriver.Chrome(options=options) as driver:
         driver.delete_all_cookies()
