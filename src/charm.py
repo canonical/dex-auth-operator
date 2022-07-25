@@ -2,33 +2,22 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import json
 import logging
 import subprocess
-from functools import wraps
-from glob import glob
-from hashlib import sha256
-from pathlib import Path
 from random import choices
 from string import ascii_letters
 from uuid import uuid4
 
 import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from lightkube import ApiError, Client, codecs
-from lightkube.resources.apps_v1 import StatefulSet, Deployment
+from ops.pebble import Layer
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 from serialized_data_interface import get_interface, NoVersionsListed
-from tenacity import (
-    Retrying,
-    retry_if_exception_type,
-    stop_after_delay,
-    wait_exponential,
-)
 
 
 try:
@@ -41,20 +30,6 @@ except ImportError:
 
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
-
-
-def only_leader(handler):
-    """Ensures method only runs if unit is a leader."""
-
-    @wraps(handler)
-    def wrapper(self, event):
-        if not self.unit.is_leader():
-            # We can't do anything useful when not the leader, so do nothing.
-            self.model.unit.status = WaitingStatus("Waiting for leadership")
-        else:
-            handler(self, event)
-
-    return wrapper
 
 
 class Operator(CharmBase):
@@ -78,96 +53,55 @@ class Operator(CharmBase):
 
         self.dashboard_provider = GrafanaDashboardProvider(self)
 
+        self._container_name = "dex"
+        self._namespace = self.model.name
+        self._container = self.unit.get_container(self._container_name)
+        self._entrypoint = "/usr/local/bin/docker-entrypoint"
+        self._dex_config_path = "/etc/dex/config.docker.yaml"
+
+        self.service_patcher = KubernetesServicePatch(
+            self, [(self._container_name, self.model.config["port"])]
+        )
+
         for event in [
             self.on.install,
+            self.on.leader_elected,
             self.on.upgrade_charm,
             self.on.config_changed,
             self.on.oidc_client_relation_changed,
             self.on.ingress_relation_changed,
+            self.on.dex_pebble_ready,
         ]:
             self.framework.observe(event, self.main)
 
-        self._max_time_checking_resources = 150
+    @property
+    def _dex_auth_layer(self) -> Layer:
+        """Returns a pre-configured Pebble layer."""
 
-    @only_leader
-    def main(self, event):
-        self.model.unit.status = MaintenanceStatus("Calculating manifests")
-        self.ensure_state()
-
-        try:
-            manifest = self.get_manifest()
-        except Exception as err:
-            self.model.unit.status = BlockedStatus(str(err))
-            return
-
-        self.model.unit.status = MaintenanceStatus("Applying manifests")
-        errors = self.set_manifest(manifest)
-
-        if errors:
-            self.model.unit.status = BlockedStatus(
-                f"There were {len(errors)} errors while applying manifests."
-            )
-            for error in errors:
-                self.logger.error(error)
-        else:
-            # Ensure requested resources are up
-            try:
-                for attempt in Retrying(
-                    retry=retry_if_exception_type(CheckFailedError),
-                    stop=stop_after_delay(max_delay=self._max_time_checking_resources),
-                    wait=wait_exponential(multiplier=0.1, min=0.1, max=15),
-                    reraise=True,
-                ):
-                    with attempt:
-                        self.logger.info(
-                            f"Checking status of requested resources (attempt "
-                            f"{attempt.retry_state.attempt_number})"
-                        )
-                        self._check_deployed_resources()
-            except CheckFailedError:
-                self.unit.status = BlockedStatus(
-                    "Some Kubernetes resources did not start correctly during install"
-                )
-                return
-
-            # Otherwise, application is working as expected
-            self.model.unit.status = ActiveStatus()
-
-    @only_leader
-    def remove(self, event):
-        """Remove charm."""
-
-        self.model.unit.status = MaintenanceStatus("Calculating manifests")
-        self.ensure_state()
-
-        manifest = self.get_manifest()
-
-        self.model.unit.status = MaintenanceStatus("Removing manifests")
-
-        self.remove_manifest(manifest)
-
-    def ensure_state(self):
-        self.state.set_default(
-            username="admin",
-            password="".join(choices(ascii_letters, k=30)),
-            salt=bcrypt.gensalt(),
-            user_id=str(uuid4()),
-        )
-
-    def get_manifest(self):
-        # Handle ingress
-        ingress = self._get_interface("ingress")
-
-        if ingress:
-            for app_name, version in ingress.versions.items():
-                data = {
-                    "prefix": "/dex",
-                    "rewrite": "/dex",
-                    "service": self.model.app.name,
-                    "port": self.model.config["port"],
+        layer_config = {
+            "summary": "dex-auth-operator layer",
+            "description": "pebble config layer for dex-auth-operator",
+            "services": {
+                self._container_name: {
+                    "override": "replace",
+                    "summary": "entrypoint of the dex-auth-operator image",
+                    "command": f"{self._entrypoint} dex serve {self._dex_config_path}",
+                    "startup": "enabled",
+                    "environment": {
+                        "KUBERNETES_POD_NAMESPACE": self._namespace,
+                    },
                 }
+            },
+        }
+        return Layer(layer_config)
 
-                ingress.send_data(data, app_name)
+    def _update_layer(self) -> None:
+        """Updates the Pebble configuration layer if changed."""
+        try:
+            self._check_container_connection()
+        except CheckFailedError as err:
+            self.model.unit.status = err.status
+            return
 
         # Get OIDC client info
         oidc = self._get_interface("oidc-client")
@@ -183,6 +117,7 @@ class Operator(CharmBase):
         public_url = self.model.config["public-url"].lower()
         if not public_url.startswith(("http://", "https://")):
             public_url = f"http://{public_url}"
+
         static_username = self.model.config["static-username"] or self.state.username
         static_password = self.model.config["static-password"] or self.state.password
         static_password = static_password.encode("utf-8")
@@ -200,7 +135,7 @@ class Operator(CharmBase):
             ],
         }
 
-        config = json.dumps(
+        config = yaml.dump(
             {
                 "issuer": f"{public_url}/dex",
                 "storage": {"type": "kubernetes", "config": {"inCluster": True}},
@@ -213,74 +148,70 @@ class Operator(CharmBase):
             }
         )
 
-        # Kubernetes won't automatically restart the pod when the configmap changes
-        # unless we manually add the hash somewhere into the Deployment spec, so that
-        # it changes whenever the configmap changes.
-        config_hash = sha256()
-        config_hash.update(config.encode("utf-8"))
+        # Get current layer
+        current_layer = self._container.get_plan()
+        # Create a new config layer
+        new_layer = self._dex_auth_layer
+        if current_layer.services != new_layer.services:
+            self.unit.status = MaintenanceStatus("Applying new pebble layer")
+            self._container.add_layer(self._container_name, new_layer, combine=True)
+            self.logger.info("Pebble plan updated with new configuration")
 
-        context = {
-            "name": self.model.app.name.replace("-operator", ""),
-            "namespace": self.model.name,
-            "port": self.model.config["port"],
-            "config_yaml": config,
-            "config_hash": config_hash.hexdigest(),
-        }
+        # Get current dex config
+        current_config = self._container.pull(self._dex_config_path).read()
+        if current_config != config:
+            self._container.push(self._dex_config_path, config, make_dirs=True)
+            self.logger.info("Updated dex config")
 
-        return [
-            obj
-            for path in glob("src/manifests/*.yaml")
-            for obj in codecs.load_all_yaml(Path(path).read_text(), context=context)
-        ]
+        # Using restart due to https://github.com/canonical/dex-auth-operator/issues/63
+        self._container.restart(self._container_name)
 
-    def _check_deployed_resources(self, manifest=None):
-        """Check the status of deployed resources, returning True if ok else raising CheckFailedError
+    def main(self, event):
+        try:
+            self._check_leader()
+        except CheckFailedError as err:
+            self.model.unit.status = err.status
+            return
 
-        All abnormalities are captured in logs
+        self.model.unit.status = MaintenanceStatus("Configuring dex charm")
+        self.ensure_state()
 
-        Params:
-          manifest: (Optional) list of lightkube objects describing the entire application.  If
-                    omitted, will be computed using self.get_manifest()
-        """
-        if manifest:
-            expected_resources = manifest
-        else:
-            expected_resources = self.get_manifest()
-        found_resources = [None] * len(expected_resources)
-        errors = []
+        self._update_layer()
 
-        client = Client()
+        self.handle_ingress()
 
-        self.logger.info("Checking for expected resources")
-        for i, resource in enumerate(expected_resources):
-            try:
-                found_resources[i] = client.get(
-                    type(resource),
-                    resource.metadata.name,
-                    namespace=resource.metadata.namespace,
-                )
-            except ApiError:
-                errors.append(
-                    f"Cannot find k8s object for metadata '{resource.metadata}'"
-                )
+        self.model.unit.status = ActiveStatus()
 
-        self.logger.info("Checking readiness of found StatefulSets/Deployments")
-        statefulsets_ok, statefulsets_errors = validate_statefulsets_and_deployments(
-            found_resources
+    def ensure_state(self):
+        self.state.set_default(
+            username="admin",
+            password="".join(choices(ascii_letters, k=30)),
+            salt=bcrypt.gensalt(),
+            user_id=str(uuid4()),
         )
-        errors.extend(statefulsets_errors)
 
-        # Log any errors
-        for err in errors:
-            self.logger.info(err)
+    def handle_ingress(self):
+        ingress = self._get_interface("ingress")
 
-        if len(errors) == 0:
-            return True
-        else:
-            raise CheckFailedError(
-                "Some Kubernetes resources missing/not ready.  See logs for details",
-                WaitingStatus,
-            )
+        if ingress:
+            for app_name, version in ingress.versions.items():
+                data = {
+                    "prefix": "/dex",
+                    "rewrite": "/dex",
+                    "service": self.model.app.name,
+                    "port": self.model.config["port"],
+                }
+
+                ingress.send_data(data, app_name)
+
+    def _check_leader(self):
+        if not self.unit.is_leader():
+            # We can't do anything useful when not the leader, so do nothing.
+            raise CheckFailedError("Waiting for leadership", WaitingStatus)
+
+    def _check_container_connection(self):
+        if not self._container.can_connect():
+            raise CheckFailedError("Waiting for pod startup to complete", WaitingStatus)
 
     def _get_interface(self, interface_name):
         # Remove this abstraction when SDI adds .status attribute to NoVersionsListed,
@@ -295,54 +226,9 @@ class Operator(CharmBase):
             self.logger.debug("_get_interface ~ Checkfailederror catch")
             self.model.unit.status = err.status
             self.logger.info(str(err.status))
-            return None
+            return
 
         return interface
-
-    @staticmethod
-    def set_manifest(manifest):
-        client = Client()
-        errors = []
-
-        for resource in manifest:
-            try:
-                client.create(resource)
-            except ApiError as err:
-                if err.status.reason == "AlreadyExists":
-                    client.patch(type(resource), resource.metadata.name, resource)
-                else:
-                    errors.append(err)
-
-        return errors
-
-    @staticmethod
-    def remove_manifest(manifest):
-        client = Client()
-
-        for resource in manifest:
-            client.delete(type(resource), resource.metadata.name)
-
-
-def validate_statefulsets_and_deployments(objs):
-    """Determines if all StatefulSets/Deployments have the expected number of readyReplicas
-
-    Returns: Tuple of (Success [Boolean], Errors [list of str error messages]
-    """
-    errors = []
-
-    for obj in objs:
-        if isinstance(obj, (StatefulSet, Deployment)):
-            readyReplicas = obj.status.readyReplicas
-            replicas_expected = obj.spec.replicas
-            if readyReplicas != replicas_expected:
-                message = (
-                    f"StatefulSet {obj.metadata.name} in namespace "
-                    f"{obj.metadata.namespace} has {readyReplicas} readyReplicas, "
-                    f"expected {replicas_expected}"
-                )
-                errors.append(message)
-
-    return len(errors) == 0, errors
 
 
 class CheckFailedError(Exception):

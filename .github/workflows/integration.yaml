@@ -54,8 +54,54 @@ jobs:
         uses: charmed-kubernetes/actions-operator@main
         with:
             provider: microk8s
+            # TODO: Change to 1.22 once https://github.com/juju/python-libjuju/issues/684 is fixed
             channel: 1.21/stable
 
       # https://github.com/charmed-kubernetes/actions-operator/issues/27
       - run: sudo snap refresh charmcraft --channel latest/candidate
-      - run: tox -e integration
+
+      - name: Run test
+        run: |
+          sg microk8s -c "microk8s enable rbac ingress metallb:10.64.140.43-10.64.140.49"
+          # Requires the model to be called kubeflow due to this bug:
+          # https://github.com/kubeflow/kubeflow/issues/6136
+          juju add-model kubeflow
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt install ./google-chrome-stable_current_amd64.deb
+          sudo apt-get install chromium-chromedriver
+          sg microk8s -c "tox -e integration -- --model kubeflow"
+
+      - name: Get istio gateway
+        run: kubectl get gateway -A
+        if: failure()
+
+      - name: Get virtual services
+        run: kubectl get virtualservices -A
+        if: failure()
+
+      - name: Get juju status
+        run: juju status --relations
+        if: failure()
+
+      - name: Get oidc-gatekeeper workload logs
+        run: kubectl logs -l app.kubernetes.io/name=oidc-gatekeeper -n kubeflow
+        if: failure()
+
+      - name: Get oidc-gatekeeper operator logs
+        run: kubectl logs -l operator.juju.is/name=oidc-gatekeeper -n kubeflow
+        if: failure()
+
+      - name: Get dex container logs
+        run: kubectl logs dex-auth-0 -c dex -n kubeflow
+        if: failure()
+
+      - name: Get dex container config
+        run: kubectl exec -it dex-auth-0 -c dex -n kubeflow -- cat /etc/dex/config.docker.yaml
+        if: failure()
+
+      - name: Upload selenium screenshots
+        uses: actions/upload-artifact@v2
+        with:
+          name: selenium-screenshots
+          path: /tmp/selenium-*.png
+        if: failure()

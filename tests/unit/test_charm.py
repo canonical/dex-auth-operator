@@ -1,10 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import json
-from glob import glob
-from pathlib import Path
-from unittest.mock import call, patch
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -19,9 +16,12 @@ def harness():
     return Harness(Operator)
 
 
+@patch("charm.KubernetesServicePatch", lambda x, y: None)
 def test_not_leader(harness):
     harness.begin_with_initial_hooks()
     assert isinstance(harness.charm.model.unit.status, WaitingStatus)
+    assert ("status_set", "waiting", "Waiting for leadership", {"is_app": False}) \
+           in harness._get_backend_calls()
 
 
 def ensure_state(self):
@@ -31,70 +31,36 @@ def ensure_state(self):
     self.state.user_id = "123"
 
 
-@patch("charm.Operator._check_deployed_resources")
-@patch("charm.codecs")
-@patch("charm.Client")
-@patch.object(Operator, "ensure_state", ensure_state)
-def test_main_no_relation(
-    mock_client, mock_codecs, mock_check_deployed_resources, harness
-):
-    mock_codecs.load_all_yaml.return_value = [42]
-    mock_check_deployed_resources.return_value = True
-
+@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.Operator._update_layer")
+def test_install_event(update, harness):
     harness.set_leader(True)
-    harness.begin_with_initial_hooks()
+    harness.begin()
 
-    # Ensure that manifests were loaded
-    config_yaml = {
-        "issuer": "http:///dex",
-        "storage": {"type": "kubernetes", "config": {"inCluster": True}},
-        "web": {"http": "0.0.0.0:5556"},
-        "logger": {"level": "debug", "format": "text"},
-        "oauth2": {"skipApprovalScreen": True},
-        "staticClients": [],
-        "connectors": None,
-        "enablePasswordDB": True,
-        "staticPasswords": [
-            {
-                "email": "test-username",
-                "hash": "$2b$12$T4A6H06j5ykPkY88iX0FMOc0t6Q4nvx7kvcVQrdwY1hYCZK3LMx2O",
-                "username": "test-username",
-                "userID": "123",
-            }
-        ],
-    }
+    harness.charm.on.install.emit()
+    update.assert_called()
+    assert ("status_set", "maintenance", "Configuring dex charm", {"is_app": False})\
+           in harness._get_backend_calls()
+    assert harness.get_container_pebble_plan("dex")._services is not None
 
-    manifests = [Path(path).read_text() for path in glob("src/manifests/*.yaml")]
-    context = {
-        "name": "dex-auth",
-        "namespace": None,
-        "port": 5556,
-        "config_yaml": json.dumps(config_yaml),
-        "config_hash": "de746b7609029af76f80a7daa43df83121715d1434baf13a36b32b02220b01b9",
-    }
-    context = tuple(sorted(context.items()))
-    expected = {(m, context) for m in manifests}
-    calls = {
-        (c.args[0], tuple(sorted(c.kwargs["context"].items())))
-        for c in mock_codecs.load_all_yaml.call_args_list
-    }
-    assert calls == expected
-
-    # And that they were created
-    assert mock_client().create.call_args_list == [call(42)] * 10
-
-    # And everything worked
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
 
 
-@patch("charm.Operator._check_deployed_resources")
-@patch("charm.codecs")
-@patch("charm.Client")
-@patch.object(Operator, "ensure_state", ensure_state)
-def test_main_oidc(mock_client, mock_codecs, mock_check_deployed_resources, harness):
-    mock_codecs.load_all_yaml.return_value = [42]
-    mock_check_deployed_resources.return_value = True
+@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.Operator._update_layer")
+def test_config_changed(update, harness):
+    harness.set_leader(True)
+    harness.begin()
 
+    harness.update_config({"static-username": "new-user"})
+
+    update.assert_called()
+
+
+@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.Operator._update_layer")
+@patch.object(Operator, "ensure_state", ensure_state)
+def test_main_oidc(update, harness):
     harness.set_leader(True)
     rel_id = harness.add_relation("oidc-client", "app")
 
@@ -111,60 +77,13 @@ def test_main_oidc(mock_client, mock_codecs, mock_check_deployed_resources, harn
         {"_supported_versions": "- v1", "data": yaml.dump(data)},
     )
     harness.begin_with_initial_hooks()
-
-    # Ensure that manifests were loaded
-    config_yaml = {
-        "issuer": "http:///dex",
-        "storage": {"type": "kubernetes", "config": {"inCluster": True}},
-        "web": {"http": "0.0.0.0:5556"},
-        "logger": {"level": "debug", "format": "text"},
-        "oauth2": {"skipApprovalScreen": True},
-        "staticClients": [
-            {"id": "id", "name": "name", "redirectURIs": ["uri1"], "secret": "secret"}
-        ],
-        "connectors": None,
-        "enablePasswordDB": True,
-        "staticPasswords": [
-            {
-                "email": "test-username",
-                "hash": "$2b$12$T4A6H06j5ykPkY88iX0FMOc0t6Q4nvx7kvcVQrdwY1hYCZK3LMx2O",
-                "username": "test-username",
-                "userID": "123",
-            }
-        ],
-    }
-
-    manifests = [Path(path).read_text() for path in glob("src/manifests/*.yaml")]
-    context = {
-        "name": "dex-auth",
-        "namespace": None,
-        "port": 5556,
-        "config_yaml": json.dumps(config_yaml),
-        "config_hash": "1169f8e7519f64a078398503f8d783973013c5931cab07990d5ee4b2faba5b07",
-    }
-    context = tuple(sorted(context.items()))
-    expected = {(m, context) for m in manifests}
-    calls = {
-        (c.args[0], tuple(sorted(c.kwargs["context"].items())))
-        for c in mock_codecs.load_all_yaml.call_args_list
-    }
-    assert calls == expected
-
-    # And that they were created
-    assert mock_client().create.call_args_list == [call(42)] * 20
-
-    # And everything worked
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
 
 
-@patch("charm.Operator._check_deployed_resources")
-@patch("charm.codecs")
-@patch("charm.Client")
+@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.Operator._update_layer")
 @patch.object(Operator, "ensure_state", ensure_state)
-def test_main_ingress(mock_client, mock_codecs, mock_check_deployed_resources, harness):
-    mock_codecs.load_all_yaml.return_value = [42]
-    mock_check_deployed_resources.return_value = True
-
+def test_main_ingress(update, harness):
     harness.set_leader(True)
     rel_id = harness.add_relation("ingress", "app")
     harness.add_relation_unit(rel_id, "app/0")
@@ -174,45 +93,14 @@ def test_main_ingress(mock_client, mock_codecs, mock_check_deployed_resources, h
         {"_supported_versions": "- v1"},
     )
     harness.begin_with_initial_hooks()
-
-    # Ensure that manifests were loaded
-    config_yaml = {
-        "issuer": "http:///dex",
-        "storage": {"type": "kubernetes", "config": {"inCluster": True}},
-        "web": {"http": "0.0.0.0:5556"},
-        "logger": {"level": "debug", "format": "text"},
-        "oauth2": {"skipApprovalScreen": True},
-        "staticClients": [],
-        "connectors": None,
-        "enablePasswordDB": True,
-        "staticPasswords": [
-            {
-                "email": "test-username",
-                "hash": "$2b$12$T4A6H06j5ykPkY88iX0FMOc0t6Q4nvx7kvcVQrdwY1hYCZK3LMx2O",
-                "username": "test-username",
-                "userID": "123",
-            }
-        ],
-    }
-
-    manifests = [Path(path).read_text() for path in glob("src/manifests/*.yaml")]
-    context = {
-        "name": "dex-auth",
-        "namespace": None,
-        "port": 5556,
-        "config_yaml": json.dumps(config_yaml),
-        "config_hash": "de746b7609029af76f80a7daa43df83121715d1434baf13a36b32b02220b01b9",
-    }
-    context = tuple(sorted(context.items()))
-    expected = {(m, context) for m in manifests}
-    calls = {
-        (c.args[0], tuple(sorted(c.kwargs["context"].items())))
-        for c in mock_codecs.load_all_yaml.call_args_list
-    }
-    assert calls == expected
-
-    # And that they were created
-    assert mock_client().create.call_args_list == [call(42)] * 20
-
-    # And everything worked
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
+
+    relation_data = harness.get_relation_data(rel_id, harness.charm.app.name)
+    data = {
+        "prefix": "/dex",
+        "rewrite": "/dex",
+        "service": "dex-auth",
+        "port": 5556,
+    }
+
+    assert data == yaml.safe_load(relation_data["data"])
