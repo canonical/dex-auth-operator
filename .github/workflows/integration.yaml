@@ -54,8 +54,7 @@ jobs:
         uses: charmed-kubernetes/actions-operator@main
         with:
             provider: microk8s
-            # TODO: Change to 1.22 once https://github.com/juju/python-libjuju/issues/684 is fixed
-            channel: 1.21/stable
+            channel: 1.22/stable
 
       # https://github.com/charmed-kubernetes/actions-operator/issues/27
       - run: sudo snap refresh charmcraft --channel latest/candidate
