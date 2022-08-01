@@ -21,4 +21,9 @@ requires:
     interface: ingress
     schema: https://raw.githubusercontent.com/canonical/operator-schemas/service-mesh-schemas/ingress.yaml
     versions: [v1]
+provides:
+  metrics-endpoint:
+    interface: prometheus_scrape
+  grafana-dashboard:
+    interface: grafana_dashboard
 min-juju-version: 2.8.6

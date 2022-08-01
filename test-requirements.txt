@@ -1,7 +1,8 @@
 bcrypt<3.3
 black
-flake8<4.1
+flake8==4.0.1
 juju<2.10
 pytest<6.3
 pyyaml<6.1
 requests
+tenacity<9
