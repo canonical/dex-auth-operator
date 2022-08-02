@@ -9,6 +9,8 @@ from pathlib import Path
 from uuid import uuid4
 
 import yaml
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from oci_image import OCIImageResource, OCIImageResourceError
 from ops.charm import CharmBase
 from ops.framework import StoredState
@@ -28,6 +30,10 @@ except ImportError:
     import bcrypt
 
 
+METRICS_PATH = "/metrics"
+METRICS_PORT = "5558"
+
+
 class Operator(CharmBase):
     _stored = StoredState()
 
@@ -39,6 +45,19 @@ class Operator(CharmBase):
             return
         self.log = logging.getLogger(__name__)
         self.image = OCIImageResource(self, "oci-image")
+
+        self.prometheus_provider = MetricsEndpointProvider(
+            charm=self,
+            relation_name="metrics-endpoint",
+            jobs=[
+                {
+                    "metrics_path": METRICS_PATH,
+                    "static_configs": [{"targets": ["*:{}".format(METRICS_PORT)]}],
+                }
+            ],
+        )
+
+        self.dashboard_provider = GrafanaDashboardProvider(self)
 
         try:
             self.interfaces = get_interfaces(self)
