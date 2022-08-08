@@ -3,7 +3,7 @@
 
 # need this fix but it is not yet released
 # https://github.com/juju/python-libjuju/pull/696
-git+https://github.com/juju/python-libjuju.git@80eb84e008df35c4398fe66ed161e080e3340ae5
+git+https://github.com/juju/python-libjuju.git@34981c59eac8db89320bf0067bebd2547da12d45
 bcrypt<3.3
 black
 flake8<4.1
