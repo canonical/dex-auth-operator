@@ -1,13 +1,11 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-# need this fix but it is not yet released
-# https://github.com/juju/python-libjuju/pull/696
-git+https://github.com/juju/python-libjuju.git@34981c59eac8db89320bf0067bebd2547da12d45
 bcrypt<3.3
 black
 flake8<4.1
 flake8-copyright<0.3
+juju==3.0.1
 pytest<6.3
 pyyaml<6.1
 pytest-mock
