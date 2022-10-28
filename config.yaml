@@ -24,3 +24,7 @@ options:
     type: string
     default: ''
     description: Static password for logging in without an external auth service
+  enable-password-db:
+    type: boolean
+    default: true
+    description: Enable or disable static passwords

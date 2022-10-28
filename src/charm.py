@@ -124,7 +124,7 @@ class Operator(CharmBase):
         hashed = bcrypt.hashpw(static_password, self.state.salt).decode("utf-8")
 
         static_config = {
-            "enablePasswordDB": True,
+            "enablePasswordDB": self.model.config["enable-password-db"],
             "staticPasswords": [
                 {
                     "email": static_username,
