@@ -4,26 +4,21 @@
 import json
 import logging
 from pathlib import Path
+from time import sleep
 
+import lightkube
 import pytest
 import requests
 import yaml
-import lightkube
 from lightkube.resources.apps_v1 import StatefulSet
 from lightkube.resources.core_v1 import Service
 from pytest_operator.plugin import OpsTest
 from selenium import webdriver
 from selenium.common.exceptions import JavascriptException, WebDriverException
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
-from time import sleep
-from tenacity import (
-    Retrying,
-    stop_after_attempt,
-    stop_after_delay,
-    wait_exponential,
-)
+from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
 log = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -43,10 +38,7 @@ async def test_build_and_deploy(ops_test):
     my_charm = await ops_test.build_charm(".")
     dex_image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     await ops_test.model.deploy(
-        my_charm,
-        resources={"oci-image": dex_image_path},
-        trust=True,
-        config=DEX_CONFIG
+        my_charm, resources={"oci-image": dex_image_path}, trust=True, config=DEX_CONFIG
     )
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME], status="active", raise_on_blocked=True, timeout=600
@@ -183,7 +175,7 @@ def test_login(driver):
     driver.find_element(By.ID, "submit-login").click()
 
     # Check if main page was loaded
-    script = fix_queryselector(['main-page', 'dashboard-view', '#Quick-Links'])
+    script = fix_queryselector(["main-page", "dashboard-view", "#Quick-Links"])
     wait.until(lambda x: x.execute_script(script))
 
 
@@ -213,19 +205,16 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(status="active", timeout=60 * 10)
 
     status = await ops_test.model.get_status()
-    prometheus_unit_ip = status["applications"][prometheus]["units"][f"{prometheus}/0"][
-        "address"
-    ]
+    prometheus_unit_ip = status["applications"][prometheus]["units"][f"{prometheus}/0"]["address"]
     log.info(f"Prometheus available at http://{prometheus_unit_ip}:9090")
 
     for attempt in retry_for_5_attempts:
         log.info(
-            f"Testing prometheus deployment (attempt "
-            f"{attempt.retry_state.attempt_number})"
+            f"Testing prometheus deployment (attempt " f"{attempt.retry_state.attempt_number})"
         )
         with attempt:
             r = requests.get(
-                f'http://{prometheus_unit_ip}:9090/api/v1/query?'
+                f"http://{prometheus_unit_ip}:9090/api/v1/query?"
                 f'query=up{{juju_application="{APP_NAME}"}}'
             )
             response = json.loads(r.content.decode("utf-8"))
