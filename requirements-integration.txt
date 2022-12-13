@@ -55,7 +55,7 @@ chardet==3.0.4
     # via
     #   -r ./requirements.txt
     #   requests
-charset-normalizer==2.1.1
+charset-normalizer==3.0.1
     # via aiohttp
 cryptography==38.0.4
     # via
