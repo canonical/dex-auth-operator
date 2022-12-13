@@ -106,7 +106,7 @@ async def test_relations(ops_test: OpsTest):
     )
 
     await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge")
-    await ops_test.model.deploy("kubeflow-dashboard", channel="latest/edge")
+    await ops_test.model.deploy("kubeflow-dashboard", channel="latest/edge", trust=True)
     await ops_test.model.add_relation("kubeflow-profiles", "kubeflow-dashboard")
     await ops_test.model.add_relation(f"{istio_pilot}:ingress", "kubeflow-dashboard:ingress")
 
