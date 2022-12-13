@@ -1,0 +1,7 @@
+# Copyright 2021 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+jinja2
+ops
+lightkube
+serialized-data-interface<0.4

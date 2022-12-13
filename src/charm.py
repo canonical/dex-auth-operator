@@ -12,13 +12,12 @@ import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from ops.pebble import Layer
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
-from serialized_data_interface import get_interface, NoVersionsListed
-
+from ops.pebble import Layer
+from serialized_data_interface import NoVersionsListed, get_interface
 
 try:
     import bcrypt
