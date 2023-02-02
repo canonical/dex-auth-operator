@@ -102,7 +102,7 @@ jobs:
         if: failure()
 
       - name: Upload selenium screenshots
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: selenium-screenshots
           path: /tmp/selenium-*.png
