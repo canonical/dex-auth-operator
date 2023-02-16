@@ -4,6 +4,10 @@ name: dex-auth
 summary: A federated OpenID Connect provider
 description: |
   Dex is an identity service that uses OpenID Connect to drive authentication for other apps.
+website: https://charmhub.io/dex-auth
+source: https://github.com/canonical/dex-auth-operator
+issues: https://github.com/canonical/dex-auth-operator/issues
+docs: https://discourse.charmhub.io/t/charmed-dex/8214
 requires:
   oidc-client:
     interface: oidc-client
