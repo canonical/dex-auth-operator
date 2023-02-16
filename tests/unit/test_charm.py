@@ -20,8 +20,12 @@ def harness():
 def test_not_leader(harness):
     harness.begin_with_initial_hooks()
     assert isinstance(harness.charm.model.unit.status, WaitingStatus)
-    assert ("status_set", "waiting", "Waiting for leadership", {"is_app": False}) \
-           in harness._get_backend_calls()
+    assert (
+        "status_set",
+        "waiting",
+        "Waiting for leadership",
+        {"is_app": False},
+    ) in harness._get_backend_calls()
 
 
 def ensure_state(self):
@@ -39,8 +43,12 @@ def test_install_event(update, harness):
 
     harness.charm.on.install.emit()
     update.assert_called()
-    assert ("status_set", "maintenance", "Configuring dex charm", {"is_app": False})\
-           in harness._get_backend_calls()
+    assert (
+        "status_set",
+        "maintenance",
+        "Configuring dex charm",
+        {"is_app": False},
+    ) in harness._get_backend_calls()
     assert harness.get_container_pebble_plan("dex")._services is not None
 
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)

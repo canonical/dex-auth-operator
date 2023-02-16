@@ -11,50 +11,53 @@ jobs:
 
   lib-check:
     name: Check libraries
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - name: Check libs
-        uses: canonical/charming-actions/check-libraries@2.0.0-rc
+        uses: canonical/charming-actions/check-libraries@2.2.2
         with:
           credentials: "${{ secrets.charmcraft-credentials }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - name: Check out code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     - run: pip install tox
     - run: tox -vve lint
 
   unit-test:
     name: Unit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - run: pip install tox
       - run: tox -e unit
 
   integration-test:
     name: Integration
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
+        uses: claudiubelu/actions-operator@18ebf92ae3043bd3dd15238e5d9b662d7ba08daf
         with:
-            provider: microk8s
-            channel: 1.22/stable
+          provider: microk8s
+          channel: 1.24/stable
+          # Pinned until this bug is resolved: https://bugs.launchpad.net/juju/+bug/1992833
+          bootstrap-options: "--agent-version=2.9.34"
+          microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
 
       # https://github.com/charmed-kubernetes/actions-operator/issues/27
       - run: sudo snap refresh charmcraft --channel latest/candidate
@@ -99,7 +102,7 @@ jobs:
         if: failure()
 
       - name: Upload selenium screenshots
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: selenium-screenshots
           path: /tmp/selenium-*.png
