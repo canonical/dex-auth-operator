@@ -60,9 +60,22 @@ def test_config_changed(update, harness):
     harness.set_leader(True)
     harness.begin()
 
-    harness.update_config({"static-username": "new-user"})
+    config_updates = {
+        "enablePasswordDB": False,
+        "port": 5555,
+        "public-url": "dummy.url",
+        "connectors": "connector01",
+        "static-username": "new-user",
+        "static-password": "new-pass",
+    }
+
+    harness.update_config(config_updates)
 
     update.assert_called()
+
+    new_config = harness.model.config
+
+    assert new_config == config_updates
 
 
 @patch("charm.KubernetesServicePatch", lambda x, y: None)
