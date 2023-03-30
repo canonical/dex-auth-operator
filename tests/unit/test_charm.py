@@ -61,7 +61,7 @@ def test_config_changed(update, harness):
     harness.begin()
 
     config_updates = {
-        "enablePasswordDB": False,
+        "enable-password-db": False,
         "port": 5555,
         "public-url": "dummy.url",
         "connectors": "connector01",
