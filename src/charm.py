@@ -113,7 +113,7 @@ class Operator(CharmBase):
         if not public_url.startswith(("http://", "https://")):
             public_url = f"http://{public_url}"
 
-        enable_password_db = self.model.config["enablePasswordDB"]
+        enable_password_db = self.model.config["enable-password-db"]
         static_username = self.model.config["static-username"] or self.state.username
         static_password = self.model.config["static-password"] or self.state.password
         static_password = static_password.encode("utf-8")
