@@ -3,9 +3,9 @@
 # See LICENSE file for licensing details.
 
 import logging
+import re
 import subprocess
 from random import choices
-import re
 from string import ascii_letters
 from uuid import uuid4
 
@@ -116,16 +116,16 @@ class Operator(CharmBase):
         port = self.model.config["port"]
         public_url = self.model.config["public-url"].lower()
         if len(public_url) == 0:
-            public_url = f"http://{self.model.app.name}.{self.model.name}.svc.cluster.local:{port}"
+            public_url = f"http://{self.model.app.name}.{self.model.name}.svc.cluster.local:{port}/dex"
 
         if not public_url.startswith(("http://", "https://")):
             public_url = f"http://{public_url}"
 
-        # If public_url is a kubernetes-internal URL, it points directly to dex.  Otherwise, we
-        # need to route to /dex
-        kubernetes_internal_url_pattern = r".+\.svc\.cluster\.local\:\d+"
-        if not re.match(kubernetes_internal_url_pattern, self.public_url):
-            self.public_url += "/dex"
+        public_url = public_url.rstrip("/")
+        if not public_url.endswith("/dex"):
+            public_url += "/dex"
+
+        logging.info(f"Configuring dex with public_url = {public_url}")
 
         static_username = self.model.config["static-username"] or self.state.username
         static_password = self.model.config["static-password"] or self.state.password
