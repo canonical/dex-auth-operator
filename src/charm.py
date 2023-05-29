@@ -5,6 +5,7 @@
 import logging
 import subprocess
 from random import choices
+import re
 from string import ascii_letters
 from uuid import uuid4
 
@@ -114,8 +115,17 @@ class Operator(CharmBase):
         connectors = yaml.safe_load(self.model.config["connectors"])
         port = self.model.config["port"]
         public_url = self.model.config["public-url"].lower()
+        if len(public_url) == 0:
+            public_url = f"http://{self.model.app.name}.{self.model.name}.svc.cluster.local:{port}"
+
         if not public_url.startswith(("http://", "https://")):
             public_url = f"http://{public_url}"
+
+        # If public_url is a kubernetes-internal URL, it points directly to dex.  Otherwise, we
+        # need to route to /dex
+        kubernetes_internal_url_pattern = r".+\.svc\.cluster\.local\:\d+"
+        if not re.match(kubernetes_internal_url_pattern, self.public_url):
+            self.public_url += "/dex"
 
         static_username = self.model.config["static-username"] or self.state.username
         static_password = self.model.config["static-password"] or self.state.password
@@ -136,7 +146,7 @@ class Operator(CharmBase):
 
         config = yaml.dump(
             {
-                "issuer": f"{public_url}/dex",
+                "issuer": public_url,
                 "storage": {"type": "kubernetes", "config": {"inCluster": True}},
                 "web": {"http": f"0.0.0.0:{port}"},
                 "logger": {"level": "debug", "format": "text"},
