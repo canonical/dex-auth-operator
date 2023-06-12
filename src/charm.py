@@ -15,7 +15,7 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, ErrorStatus
 from ops.pebble import Layer
 from serialized_data_interface import NoVersionsListed, get_interface, get_interfaces
 
@@ -233,9 +233,7 @@ class Operator(CharmBase):
         try:
             interfaces = get_interfaces(self)
         except NoVersionsListed as err:
-            self.logger.debug("_get_interface ~ Checkfailederror catch")
-            self.model.unit.status = err.status
-            self.logger.info(str(err.status))
+            self.model.status = ErrorStatus(str(err))
             return
         return interfaces
 
