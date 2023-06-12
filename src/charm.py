@@ -17,7 +17,7 @@ from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import Layer
-from serialized_data_interface import NoVersionsListed, get_interface
+from serialized_data_interface import NoVersionsListed, get_interface, get_interfaces
 
 try:
     import bcrypt
@@ -190,18 +190,17 @@ class Operator(CharmBase):
         )
 
     def handle_ingress(self):
-        ingress = self._get_interface("ingress")
+        interfaces = self._get_interfaces()
 
-        if ingress:
-            for app_name, version in ingress.versions.items():
-                data = {
-                    "prefix": "/dex",
-                    "rewrite": "/dex",
-                    "service": self.model.app.name,
-                    "port": self.model.config["port"],
-                }
+        if interfaces["ingress"]:
+            data = {
+                "prefix": "/dex",
+                "rewrite": "/dex",
+                "service": self.model.app.name,
+                "port": self.model.config["port"],
+            }
 
-                ingress.send_data(data, app_name)
+            interfaces["ingress"].send_data(data)
 
     def _check_leader(self):
         if not self.unit.is_leader():
@@ -228,6 +227,17 @@ class Operator(CharmBase):
             return
 
         return interface
+
+    def _get_interfaces(self):
+        """Get all SDI interfaces."""
+        try:
+            interfaces = get_interfaces(self)
+        except NoVersionsListed as err:
+            self.logger.debug("_get_interface ~ Checkfailederror catch")
+            self.model.unit.status = err.status
+            self.logger.info(str(err.status))
+            return
+        return interfaces
 
 
 class CheckFailedError(Exception):
