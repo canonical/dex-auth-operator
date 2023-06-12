@@ -183,7 +183,12 @@ class Operator(CharmBase):
 
         self._update_layer()
 
-        self.handle_ingress()
+        try:
+            self.handle_ingress()
+        except ErrorWithStatus as err:
+            self.model.unit.status = err.status
+            self.logger.error(f"Failed to handle {event} with error: {err}")
+            return
 
         self.model.unit.status = ActiveStatus()
 
