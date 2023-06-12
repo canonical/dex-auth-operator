@@ -9,15 +9,16 @@ from string import ascii_letters
 from uuid import uuid4
 
 import yaml
+from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, ErrorStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, BlockedStatus
 from ops.pebble import Layer
-from serialized_data_interface import NoVersionsListed, get_interface, get_interfaces
+from serialized_data_interface import NoVersionsListed, get_interface, get_interfaces, NoCompatibleVersions
 
 try:
     import bcrypt
@@ -233,8 +234,10 @@ class Operator(CharmBase):
         try:
             interfaces = get_interfaces(self)
         except NoVersionsListed as err:
-            self.model.status = ErrorStatus(str(err))
-            return
+            raise ErrorWithStatus(str(err), WaitingStatus)
+        except NoCompatibleVersions as err:
+            raise ErrorWithStatus(str(err), BlockedStatus)
+
         return interfaces
 
 
