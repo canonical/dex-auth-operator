@@ -20,9 +20,12 @@ from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import Layer
 from serialized_data_interface import NoVersionsListed, get_interface
 
-subprocess.check_call(["apt", "update"])
-subprocess.check_call(["apt", "install", "-y", "python3-bcrypt"])
-import bcrypt  # noqa: E402
+try:
+    import bcrypt
+except ImportError:
+    subprocess.check_call(["apt", "update"])
+    subprocess.check_call(["apt", "install", "-y", "python3-bcrypt"])
+    import bcrypt
 
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
