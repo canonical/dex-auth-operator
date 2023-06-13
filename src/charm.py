@@ -16,22 +16,13 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import Layer
-from serialized_data_interface import (
-    NoCompatibleVersions,
-    NoVersionsListed,
-    get_interface,
-    get_interfaces,
-)
+from serialized_data_interface import NoVersionsListed, get_interface
 
-try:
-    import bcrypt
-except ImportError:
-    subprocess.check_call(["apt", "update"])
-    subprocess.check_call(["apt", "install", "-y", "python3-bcrypt"])
-    import bcrypt
-
+subprocess.check_call(["apt", "update"])
+subprocess.check_call(["apt", "install", "-y", "python3-bcrypt"])
+import bcrypt  # noqa: E402
 
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
@@ -102,11 +93,7 @@ class Operator(CharmBase):
 
     def _update_layer(self) -> None:
         """Updates the Pebble configuration layer if changed."""
-        try:
-            self._check_container_connection()
-        except CheckFailedError as err:
-            self.model.unit.status = err.status
-            return
+        self._check_container_connection()
 
         # Get OIDC client info
         oidc = self._get_interface("oidc-client")
@@ -171,27 +158,6 @@ class Operator(CharmBase):
         # Using restart due to https://github.com/canonical/dex-auth-operator/issues/63
         self._container.restart(self._container_name)
 
-    def main(self, event):
-        try:
-            self._check_leader()
-        except CheckFailedError as err:
-            self.model.unit.status = err.status
-            return
-
-        self.model.unit.status = MaintenanceStatus("Configuring dex charm")
-        self.ensure_state()
-
-        self._update_layer()
-
-        try:
-            self.handle_ingress()
-        except ErrorWithStatus as err:
-            self.model.unit.status = err.status
-            self.logger.error(f"Failed to handle {event} with error: {err}")
-            return
-
-        self.model.unit.status = ActiveStatus()
-
     def ensure_state(self):
         self.state.set_default(
             username="admin",
@@ -201,65 +167,53 @@ class Operator(CharmBase):
         )
 
     def handle_ingress(self):
-        interfaces = self._get_interfaces()
+        interface = self._get_interface("ingress")
 
-        if interfaces["ingress"]:
-            data = {
-                "prefix": "/dex",
-                "rewrite": "/dex",
-                "service": self.model.app.name,
-                "port": self.model.config["port"],
-            }
+        if not interface:
+            return
 
-            interfaces["ingress"].send_data(data)
+        data = {
+            "prefix": "/dex",
+            "rewrite": "/dex",
+            "service": self.model.app.name,
+            "port": self.model.config["port"],
+        }
+
+        interface.send_data(data)
 
     def _check_leader(self):
         if not self.unit.is_leader():
             # We can't do anything useful when not the leader, so do nothing.
-            raise CheckFailedError("Waiting for leadership", WaitingStatus)
+            raise ErrorWithStatus("Waiting for leadership", WaitingStatus)
 
     def _check_container_connection(self):
         if not self._container.can_connect():
-            raise CheckFailedError("Waiting for pod startup to complete", WaitingStatus)
+            raise ErrorWithStatus("Waiting for pod startup to complete", WaitingStatus)
 
     def _get_interface(self, interface_name):
         # Remove this abstraction when SDI adds .status attribute to NoVersionsListed,
         # NoCompatibleVersionsListed:
         # https://github.com/canonical/serialized-data-interface/issues/26
         try:
-            try:
-                interface = get_interface(self, interface_name)
-            except NoVersionsListed as err:
-                raise CheckFailedError(str(err), WaitingStatus)
-        except CheckFailedError as err:
-            self.logger.debug("_get_interface ~ Checkfailederror catch")
-            self.model.unit.status = err.status
-            self.logger.info(str(err.status))
-            return
+            interface = get_interface(self, interface_name)
+        except NoVersionsListed as err:
+            raise ErrorWithStatus(str(err), WaitingStatus)
 
         return interface
 
-    def _get_interfaces(self):
-        """Get all SDI interfaces."""
+    def main(self, event):
         try:
-            interfaces = get_interfaces(self)
-        except NoVersionsListed as err:
-            raise ErrorWithStatus(str(err), WaitingStatus)
-        except NoCompatibleVersions as err:
-            raise ErrorWithStatus(str(err), BlockedStatus)
+            self._check_leader()
+            self.model.unit.status = MaintenanceStatus("Configuring dex charm")
+            self.ensure_state()
+            self._update_layer()
+            self.handle_ingress()
+        except ErrorWithStatus as err:
+            self.model.unit.status = err.status
+            self.logger.error(f"Failed to handle {event} with error: {err}")
+            return
 
-        return interfaces
-
-
-class CheckFailedError(Exception):
-    """Raise this exception if one of the checks in main fails."""
-
-    def __init__(self, msg, status_type=None):
-        super().__init__()
-
-        self.msg = str(msg)
-        self.status_type = status_type
-        self.status = status_type(msg)
+        self.model.unit.status = ActiveStatus()
 
 
 if __name__ == "__main__":
