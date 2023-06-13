@@ -16,9 +16,9 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus, BlockedStatus
 from ops.pebble import Layer
-from serialized_data_interface import NoVersionsListed, get_interface
+from serialized_data_interface import NoVersionsListed, get_interface, NoCompatibleVersions
 
 try:
     import bcrypt
@@ -194,9 +194,6 @@ class Operator(CharmBase):
             raise ErrorWithStatus("Waiting for pod startup to complete", WaitingStatus)
 
     def _get_interface(self, interface_name):
-        # Remove this abstraction when SDI adds .status attribute to NoVersionsListed,
-        # NoCompatibleVersionsListed:
-        # https://github.com/canonical/serialized-data-interface/issues/26
         try:
             interface = get_interface(self, interface_name)
         except NoVersionsListed as err:
