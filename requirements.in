@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 jinja2
-ops<2
+ops<3
 lightkube
 serialized-data-interface
 charmed-kubeflow-chisme
