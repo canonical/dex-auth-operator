@@ -201,6 +201,8 @@ class Operator(CharmBase):
             interface = get_interface(self, interface_name)
         except NoVersionsListed as err:
             raise ErrorWithStatus(str(err), WaitingStatus)
+        except NoCompatibleVersions as err:
+            raise ErrorWithStatus(str(err), BlockedStatus)
 
         return interface
 
