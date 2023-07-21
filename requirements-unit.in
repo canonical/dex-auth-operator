@@ -1,6 +1,9 @@
 bcrypt
 charmed-kubeflow-chisme
 coverage
+# Workaround for https://github.com/python-jsonschema/jsonschema/issues/1117
+# and https://github.com/python-jsonschema/jsonschema/issues/1114
+jsonschema<4.18
 ops
 pytest
 pytest-mock
