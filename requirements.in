@@ -4,7 +4,7 @@ charmed-kubeflow-chisme
 jinja2
 # Workaround for https://github.com/python-jsonschema/jsonschema/issues/1117
 # and https://github.com/python-jsonschema/jsonschema/issues/1114
-jsonschema<4.18
+jsonschema<4.19
 lightkube
 ops<2
 serialized-data-interface
