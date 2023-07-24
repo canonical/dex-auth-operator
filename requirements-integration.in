@@ -8,4 +8,5 @@ pyyaml
 requests
 selenium
 selenium-wire
+serialized-data-interface
 tenacity
