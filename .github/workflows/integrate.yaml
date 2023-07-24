@@ -56,7 +56,6 @@ jobs:
 
       - name: Run test
         run: |
-          sg microk8s -c "microk8s enable rbac ingress metallb:10.64.140.43-10.64.140.49"
           # Requires the model to be called kubeflow due to this bug:
           # https://github.com/kubeflow/kubeflow/issues/6136
           juju add-model kubeflow
