@@ -1,3 +1,4 @@
+# dummy
 ## Dex Auth Operator - a component of the Charmed Kubeflow distribution from Canonical
 
 This repository hosts the Kubernetes Python Operator for Dex Auth
