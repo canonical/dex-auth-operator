@@ -13,3 +13,9 @@ parts:
   charm:
     # do not use these versions due to pypa/setuptools_scm#713
     charm-python-packages: [setuptools!=62.2.0, pip!=22.1]
+    # Workaround for https://github.com/python-jsonschema/jsonschema/issues/1114
+    # and https://github.com/crate-py/rpds/issues/6
+    # and https://github.com/python-jsonschema/jsonschema/issues/1117
+    # TODO: jsonschema is a dependency of SDI, once SDI is not used on this charm,
+    # this workaround can be removed
+    charm-binary-python-packages: [jsonschema]
