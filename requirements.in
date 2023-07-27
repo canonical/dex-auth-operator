@@ -4,4 +4,6 @@
 jinja2
 ops
 lightkube
-serialized-data-interface==0.3.6
+# dex-auth's current implementation is not compatible
+# with SDI>0.3.
+serialized-data-interface<4.0
