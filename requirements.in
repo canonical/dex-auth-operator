@@ -2,8 +2,8 @@
 # See LICENSE file for licensing details.
 
 jinja2
-ops
+ops<2
 lightkube
 # dex-auth's current implementation is not compatible
 # with SDI>0.3.
-serialized-data-interface<4.0
+serialized-data-interface<0.4
