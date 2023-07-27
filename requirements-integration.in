@@ -6,4 +6,3 @@ requests
 selenium
 selenium-wire
 tenacity
--r requirements.txt
