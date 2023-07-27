@@ -1,6 +1,7 @@
 aiohttp
 jinja2
 juju<3.1
+lightkube
 pytest-operator
 requests
 selenium
