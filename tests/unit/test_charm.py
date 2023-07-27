@@ -41,7 +41,6 @@ def test_install_event(update, harness):
     harness.set_leader(True)
     harness.begin()
 
-    harness.set_can_connect("dex", True)
     harness.charm.on.install.emit()
     update.assert_called()
     assert (
