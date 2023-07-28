@@ -47,6 +47,7 @@ jobs:
         with:
           provider: microk8s
           channel: 1.24/stable
+          juju-channel: 2.9/stable
           # Pinned until this bug is resolved: https://bugs.launchpad.net/juju/+bug/1992833
           bootstrap-options: "--agent-version=2.9.34"
           microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
@@ -56,7 +57,6 @@ jobs:
 
       - name: Run test
         run: |
-          sg microk8s -c "microk8s enable rbac ingress metallb:10.64.140.43-10.64.140.49"
           # Requires the model to be called kubeflow due to this bug:
           # https://github.com/kubeflow/kubeflow/issues/6136
           juju add-model kubeflow
