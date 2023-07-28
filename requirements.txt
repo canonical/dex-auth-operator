@@ -8,6 +8,8 @@ anyio==3.7.1
     # via httpcore
 attrs==23.1.0
     # via jsonschema
+bcrypt==4.0.1
+    # via -r ./requirements.in
 certifi==2023.7.22
     # via
     #   httpcore
