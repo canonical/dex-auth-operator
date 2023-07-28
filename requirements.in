@@ -2,6 +2,9 @@
 # See LICENSE file for licensing details.
 
 jinja2
-ops
+# pin to <2 due to track/2.31 depends on <2
+ops<2
 lightkube
+# dex-auth's current implementation is not compatible
+# with SDI>0.3.
 serialized-data-interface<0.4
