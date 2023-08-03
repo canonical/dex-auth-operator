@@ -1,4 +1,4 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 type: charm
@@ -12,3 +12,4 @@ bases:
 parts:
   charm:
     charm-python-packages: [setuptools, pip]
+    charm-binary-python-packages: [bcrypt]
