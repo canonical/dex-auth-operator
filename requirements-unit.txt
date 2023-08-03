@@ -12,8 +12,6 @@ attrs==23.1.0
     # via
     #   -r ./requirements.txt
     #   jsonschema
-bcrypt==4.0.1
-    # via -r ./requirements.txt
 certifi==2023.7.22
     # via
     #   -r ./requirements.txt

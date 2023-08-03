@@ -12,4 +12,8 @@ bases:
 parts:
   charm:
     charm-python-packages: [setuptools, pip]
-    charm-binary-python-packages: [bcrypt]
+    # Installing bcrypt from binary prevents us from having to build
+    # this package from source, as recently one of this package dependencies
+    # requires rustc a toolchain that is not installed by default in our charms.
+    # Pinning this package to <4.1 to have some sort of control over the versions.
+    charm-binary-python-packages: [bcrypt<4.1]
