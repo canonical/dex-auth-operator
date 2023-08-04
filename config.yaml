@@ -9,7 +9,10 @@ options:
   public-url:
     type: string
     default: ''
-    description: Publicly-accessible endpoint for cluster
+    description: |
+      Publicly-accessible endpoint for cluster, or the kubernetes internally-accessible 
+      url for dex-auth.  Defaults to its kubernetes internally-accessible url, as 
+      computed by the charm, if empty (typically, defaults to 'http://dex-auth.kubeflow.svc.cluster.local:5556/dex')
   connectors:
     type: string
     default: ''

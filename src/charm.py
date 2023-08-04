@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import logging
+import re
 import subprocess
 from random import choices
 from string import ascii_letters
@@ -110,8 +111,17 @@ class Operator(CharmBase):
         connectors = yaml.safe_load(self.model.config["connectors"])
         port = self.model.config["port"]
         public_url = self.model.config["public-url"].lower()
+        if len(public_url) == 0:
+            public_url = f"http://{self.model.app.name}.{self.model.name}.svc.cluster.local:{port}/dex"
+
         if not public_url.startswith(("http://", "https://")):
             public_url = f"http://{public_url}"
+
+        public_url = public_url.rstrip("/")
+        if not public_url.endswith("/dex"):
+            public_url += "/dex"
+
+        logging.info(f"Configuring dex with public_url = {public_url}")
 
         static_username = self.model.config["static-username"] or self.state.username
         static_password = self.model.config["static-password"] or self.state.password
@@ -132,7 +142,7 @@ class Operator(CharmBase):
 
         config = yaml.dump(
             {
-                "issuer": f"{public_url}/dex",
+                "issuer": public_url,
                 "storage": {"type": "kubernetes", "config": {"inCluster": True}},
                 "web": {"http": f"0.0.0.0:{port}"},
                 "logger": {"level": "debug", "format": "text"},
