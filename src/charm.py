@@ -117,22 +117,27 @@ class Operator(CharmBase):
         if not public_url.startswith(("http://", "https://")):
             public_url = f"http://{public_url}"
 
-        static_username = self.model.config["static-username"] or self.state.username
-        static_password = self.model.config["static-password"] or self.state.password
-        static_password = static_password.encode("utf-8")
-        hashed = bcrypt.hashpw(static_password, self.state.salt).decode("utf-8")
+        enable_password_db = self.model.config["enable-password-db"]
 
-        static_config = {
-            "enablePasswordDB": True,
-            "staticPasswords": [
-                {
-                    "email": static_username,
-                    "hash": hashed,
-                    "username": static_username,
-                    "userID": self.state.user_id,
-                }
-            ],
-        }
+        if enable_password_db:
+            static_username = self.model.config["static-username"] or self.state.username
+            static_password = self.model.config["static-password"] or self.state.password
+            static_password = static_password.encode("utf-8")
+            hashed = bcrypt.hashpw(static_password, self.state.salt).decode("utf-8")
+            static_config = {
+                "staticPasswords": [
+                    {
+                        "email": static_username,
+                        "hash": hashed,
+                        "username": static_username,
+                        "userID": self.state.user_id,
+                    }
+                ],
+            }
+        elif not enable_password_db:
+            static_config = {
+                "staticPasswords": [],
+            }
 
         config = yaml.dump(
             {
@@ -143,6 +148,7 @@ class Operator(CharmBase):
                 "oauth2": {"skipApprovalScreen": True},
                 "staticClients": oidc_client_info,
                 "connectors": connectors,
+                "enablePasswordDB": enable_password_db,
                 **static_config,
             }
         )
