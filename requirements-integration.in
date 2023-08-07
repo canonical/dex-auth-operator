@@ -6,6 +6,6 @@ lightkube
 pytest-operator
 pyyaml
 requests
-selenium
+selenium==4.10.0
 selenium-wire
 tenacity
