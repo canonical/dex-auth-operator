@@ -3,12 +3,16 @@
 
 from unittest.mock import patch
 
+import ops
 import pytest
 import yaml
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 
-from charm import Operator
+from charm import CheckFailedError, Operator
+
+# SIMULATE_CAN_CONNECT is needed when using ops<2
+ops.testing.SIMULATE_CAN_CONNECT = True
 
 
 @pytest.fixture
@@ -39,6 +43,7 @@ def ensure_state(self):
 @patch("charm.Operator._update_layer")
 def test_install_event(update, harness):
     harness.set_leader(True)
+    harness.set_can_connect("dex", True)
     harness.begin()
 
     harness.charm.on.install.emit()
@@ -55,24 +60,72 @@ def test_install_event(update, harness):
 
 
 @patch("charm.KubernetesServicePatch", lambda x, y: None)
+def test_generate_dex_auth_config_raises(harness):
+    """Check the method raises when static login is disabled and no connectors are provided."""
+    harness.begin()
+    config_updates = {
+        "enable-password-db": False,
+        "port": 5555,
+        "public-url": "dummy.url",
+    }
+
+    harness.update_config(config_updates)
+
+    with pytest.raises(CheckFailedError) as error:
+        harness.charm._generate_dex_auth_config()
+    assert (
+        error.value.msg
+        == "Please add a connectors configuration to proceed without a static login."
+    )
+    assert error.value.status_type == BlockedStatus
+
+
+@pytest.mark.parametrize(
+    "dex_config",
+    (
+        {
+            "enable-password-db": False,
+            "port": 5555,
+            "public-url": "dummy.url",
+            "connectors": "test-connector",
+        },
+        {
+            "enable-password-db": True,
+            "port": 5555,
+            "public-url": "dummy.url",
+            "static-username": "new-user",
+            "static-password": "new-pass",
+        },
+    ),
+)
 @patch("charm.Operator._update_layer")
-def test_disable_static_login_no_connector_blocked_status(update, harness):
+@patch.object(Operator, "ensure_state", ensure_state)
+@patch("charm.KubernetesServicePatch", lambda x, y: None)
+def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
+    """Check the method returns dex-auth configuration when different settings are provided."""
     harness.set_leader(True)
+    harness.set_can_connect("dex", True)
+    harness.begin()
+
+    harness.update_config(dex_config)
+
+    test_configuration = harness.charm._generate_dex_auth_config()
+    assert test_configuration is not None
+
+
+@patch("charm.KubernetesServicePatch", lambda x, y: None)
+def test_disable_static_login_no_connector_blocked_status(harness):
+    harness.set_leader(True)
+    harness.set_can_connect("dex", True)
     harness.begin()
 
     config_updates = {
         "enable-password-db": False,
         "port": 5555,
         "public-url": "dummy.url",
-        "connectors": "connector01",
-        "static-username": "new-user",
-        "static-password": "new-pass",
     }
 
     harness.update_config(config_updates)
-
-    update.assert_called()
-
     assert isinstance(harness.charm.model.unit.status, BlockedStatus)
 
 
