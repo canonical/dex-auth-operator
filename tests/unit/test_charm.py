@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 import yaml
-from ops.model import ActiveStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 
 from charm import Operator
@@ -56,7 +56,7 @@ def test_install_event(update, harness):
 
 @patch("charm.KubernetesServicePatch", lambda x, y: None)
 @patch("charm.Operator._update_layer")
-def test_config_changed(update, harness):
+def test_disable_static_login_no_connector_blocked_status(update, harness):
     harness.set_leader(True)
     harness.begin()
 
@@ -65,6 +65,28 @@ def test_config_changed(update, harness):
         "port": 5555,
         "public-url": "dummy.url",
         "connectors": "connector01",
+        "static-username": "new-user",
+        "static-password": "new-pass",
+    }
+
+    harness.update_config(config_updates)
+
+    update.assert_called()
+
+    assert isinstance(harness.charm.model.unit.status, BlockedStatus)
+
+
+@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.Operator._update_layer")
+def test_config_changed(update, harness):
+    harness.set_leader(True)
+    harness.begin()
+
+    config_updates = {
+        "enable-password-db": False,
+        "port": 5555,
+        "public-url": "dummy.url",
+        "connectors": "",
         "static-username": "new-user",
         "static-password": "new-pass",
     }
