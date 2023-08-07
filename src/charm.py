@@ -184,8 +184,8 @@ class Operator(CharmBase):
     def _generate_dex_auth_config(self) -> str:
         """Returns dex-auth configuration to be passed when (re)starting the dex-auth service.
 
-            Raises:
-                CheckFailedError: when static login is disabled and no connectors are configured.
+        Raises:
+            CheckFailedError: when static login is disabled and no connectors are configured.
         """
         # Get OIDC client info
         oidc = self._get_interface("oidc-client")
@@ -209,7 +209,10 @@ class Operator(CharmBase):
         # The dex-auth service cannot be started correctly when the static
         # login is disabled, but no connector configuration is provided.
         if not enable_password_db and not connectors:
-            raise CheckFailedError("Please add a connectors configuration to proceed without a static login.", BlockedStatus)
+            raise CheckFailedError(
+                "Please add a connectors configuration to proceed without a static login.",
+                BlockedStatus,
+            )
 
         if enable_password_db:
             static_username = self.model.config["static-username"] or self.state.username
@@ -242,6 +245,7 @@ class Operator(CharmBase):
         )
 
         return config
+
 
 class CheckFailedError(Exception):
     """Raise this exception if one of the checks in main fails."""
