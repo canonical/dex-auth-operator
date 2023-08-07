@@ -45,7 +45,7 @@ charset-normalizer==3.2.0
     # via
     #   aiohttp
     #   requests
-cryptography==41.0.2
+cryptography==41.0.3
     # via
     #   paramiko
     #   pyopenssl
@@ -96,7 +96,7 @@ ipdb==0.13.13
     # via pytest-operator
 ipython==8.12.2
     # via ipdb
-jedi==0.18.2
+jedi==0.19.0
     # via ipython
 jinja2==3.1.2
     # via
@@ -166,7 +166,7 @@ pyasn1-modules==0.3.0
     # via google-auth
 pycparser==2.21
     # via cffi
-pygments==2.15.1
+pygments==2.16.1
     # via ipython
 pymacaroons==0.13.0
     # via macaroonbakery
@@ -177,7 +177,7 @@ pynacl==1.5.0
     #   pymacaroons
 pyopenssl==23.2.0
     # via selenium-wire
-pyparsing==3.1.0
+pyparsing==3.1.1
     # via selenium-wire
 pyrfc3339==1.1
     # via
