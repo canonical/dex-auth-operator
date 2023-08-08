@@ -6,6 +6,7 @@ lightkube
 pytest-operator
 pyyaml
 requests
-selenium
+# Pinning to <4.11 because upgrading to 4.11.2 results in chrome version compatibility issue. See https://github.com/canonical/dex-auth-operator/issues/151.
+selenium<4.11
 selenium-wire
 tenacity
