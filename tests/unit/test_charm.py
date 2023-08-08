@@ -139,7 +139,7 @@ def test_config_changed(update, harness):
         "enable-password-db": False,
         "port": 5555,
         "public-url": "dummy.url",
-        "connectors": "",
+        "connectors": "connector01",
         "static-username": "new-user",
         "static-password": "new-pass",
     }
