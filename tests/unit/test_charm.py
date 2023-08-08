@@ -119,18 +119,23 @@ def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
     test_configuration_dict = yaml.safe_load(test_configuration)
 
     # Load the connector configuration to match the generated config in the method
-    assert yaml.safe_load(harness.model.config['connectors']) == test_configuration_dict['connectors']
+    assert (
+        yaml.safe_load(harness.model.config["connectors"]) == test_configuration_dict["connectors"]
+    )
 
     # Check if enablePasswordDB is enabled or not
-    assert harness.model.config['enable-password-db'] == test_configuration_dict['enablePasswordDB']
+    assert (
+        harness.model.config["enable-password-db"] == test_configuration_dict["enablePasswordDB"]
+    )
 
     # Check if the static username (str) are the same in the charm config and the service config
     # Not comparing password because that is encrypted
-    if not harness.model.config['static-username']:
-        assert len(test_configuration_dict.get('staticPasswords')) == 0
+    if not harness.model.config["static-username"]:
+        assert len(test_configuration_dict.get("staticPasswords")) == 0
     else:
-        assert harness.model.config['static-username'] == test_configuration_dict.get('staticPasswords')[0].get('username')
-    assert harness.model.config['static-username'] == test_configuration_dict.get('staticPasswords')[0].get('username')
+        assert harness.model.config["static-username"] == test_configuration_dict.get(
+            "staticPasswords"
+        )[0].get("username")
 
 
 @patch("charm.KubernetesServicePatch", lambda x, y: None)
