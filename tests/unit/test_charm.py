@@ -3,7 +3,6 @@
 
 from unittest.mock import patch
 
-import ops
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
@@ -54,6 +53,7 @@ def test_install_event(update, harness):
     assert harness.get_container_pebble_plan("dex")._services is not None
 
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
+
 
 @patch("charm.KubernetesServicePatch", lambda x, y: None)
 def test_generate_dex_auth_config_raises(harness):
