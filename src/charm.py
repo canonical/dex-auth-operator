@@ -91,56 +91,9 @@ class Operator(CharmBase):
         """Updates the Pebble configuration layer if changed."""
         self._check_container_connection()
 
-        # Get OIDC client info
-        oidc = self._get_interface("oidc-client")
-
-        if oidc:
-            oidc_client_info = list(oidc.get_data().values())
-        else:
-            oidc_client_info = []
-
-        # Load config values as convenient variables
-        connectors = yaml.safe_load(self.model.config["connectors"])
-        port = self.model.config["port"]
-        public_url = self.model.config["public-url"].lower()
-        if not public_url.startswith(("http://", "https://")):
-            public_url = f"http://{public_url}"
-
-        enable_password_db = self.model.config["enable-password-db"]
-
-        if enable_password_db:
-            static_username = self.model.config["static-username"] or self.state.username
-            static_password = self.model.config["static-password"] or self.state.password
-            static_password = static_password.encode("utf-8")
-            hashed = bcrypt.hashpw(static_password, self.state.salt).decode("utf-8")
-            static_config = {
-                "staticPasswords": [
-                    {
-                        "email": static_username,
-                        "hash": hashed,
-                        "username": static_username,
-                        "userID": self.state.user_id,
-                    }
-                ],
-            }
-        elif not enable_password_db:
-            static_config = {
-                "staticPasswords": [],
-            }
-
-        config = yaml.dump(
-            {
-                "issuer": f"{public_url}/dex",
-                "storage": {"type": "kubernetes", "config": {"inCluster": True}},
-                "web": {"http": f"0.0.0.0:{port}"},
-                "logger": {"level": "debug", "format": "text"},
-                "oauth2": {"skipApprovalScreen": True},
-                "staticClients": oidc_client_info,
-                "connectors": connectors,
-                "enablePasswordDB": enable_password_db,
-                **static_config,
-            }
-        )
+        # Generate dex-auth configuration to be passed to the pebble layer
+        # so the service is (re)started.
+        dex_auth_config = self._generate_dex_auth_config()
 
         # Get current layer
         current_layer = self._container.get_plan()
@@ -153,8 +106,8 @@ class Operator(CharmBase):
 
         # Get current dex config
         current_config = self._container.pull(self._dex_config_path).read()
-        if current_config != config:
-            self._container.push(self._dex_config_path, config, make_dirs=True)
+        if current_config != dex_auth_config:
+            self._container.push(self._dex_config_path, dex_auth_config, make_dirs=True)
             self.logger.info("Updated dex config")
 
         # Using restart due to https://github.com/canonical/dex-auth-operator/issues/63
@@ -215,6 +168,70 @@ class Operator(CharmBase):
             return
 
         self.model.unit.status = ActiveStatus()
+
+    def _generate_dex_auth_config(self) -> str:
+        """Returns dex-auth configuration to be passed when (re)starting the dex-auth service.
+        Raises:
+            CheckFailedError: when static login is disabled and no connectors are configured.
+        """
+        # Get OIDC client info
+        oidc = self._get_interface("oidc-client")
+        if oidc:
+            oidc_client_info = list(oidc.get_data().values())
+        else:
+            oidc_client_info = []
+
+        # Load config values as convenient variables
+        connectors = yaml.safe_load(self.model.config["connectors"])
+        port = self.model.config["port"]
+        public_url = self.model.config["public-url"].lower()
+        if not public_url.startswith(("http://", "https://")):
+            public_url = f"http://{public_url}"
+
+        enable_password_db = self.model.config["enable-password-db"]
+        static_config = {
+            "staticPasswords": [],
+        }
+
+        # The dex-auth service cannot be started correctly when the static
+        # login is disabled, but no connector configuration is provided.
+        if not enable_password_db and not connectors:
+            raise ErrorWithStatus(
+                "Please add a connectors configuration to proceed without a static login.",
+                BlockedStatus,
+            )
+
+        if enable_password_db:
+            static_username = self.model.config["static-username"] or self.state.username
+            static_password = self.model.config["static-password"] or self.state.password
+            static_password = static_password.encode("utf-8")
+            hashed = bcrypt.hashpw(static_password, self.state.salt).decode("utf-8")
+            static_config = {
+                "staticPasswords": [
+                    {
+                        "email": static_username,
+                        "hash": hashed,
+                        "username": static_username,
+                        "userID": self.state.user_id,
+                    }
+                ],
+            }
+
+        config = yaml.dump(
+            {
+                "issuer": f"{public_url}/dex",
+                "storage": {"type": "kubernetes", "config": {"inCluster": True}},
+                "web": {"http": f"0.0.0.0:{port}"},
+                "logger": {"level": "debug", "format": "text"},
+                "oauth2": {"skipApprovalScreen": True},
+                "staticClients": oidc_client_info,
+                "connectors": connectors,
+                "enablePasswordDB": enable_password_db,
+                **static_config,
+            }
+        )
+
+        return config
 
 
 if __name__ == "__main__":
