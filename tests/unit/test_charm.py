@@ -104,8 +104,8 @@ def test_generate_dex_auth_config_raises(harness):
 def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
     """Check the method returns dex-auth configuration when different settings are provided."""
     harness.set_leader(True)
-    harness.set_can_connect("dex", True)
     harness.begin()
+    harness.set_can_connect("dex", True)
 
     harness.update_config(dex_config)
 
@@ -116,8 +116,8 @@ def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
 @patch("charm.KubernetesServicePatch", lambda x, y: None)
 def test_disable_static_login_no_connector_blocked_status(harness):
     harness.set_leader(True)
-    harness.set_can_connect("dex", True)
     harness.begin()
+    harness.set_can_connect("dex", True)
 
     config_updates = {
         "enable-password-db": False,
