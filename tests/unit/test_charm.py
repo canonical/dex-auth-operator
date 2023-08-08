@@ -124,9 +124,9 @@ def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
     # Check if enablePasswordDB is enabled or not
     assert harness.model.config['enable-password-db'] == test_configuration_dict['enablePasswordDB']
 
-    # Check if the static username and paswords (str) are the same in the charm config and the service config
-    assert harness.model.config['static-username'] == test_configuration_dict['static-username']
-    assert harness.model.config['static-password'] == test_configuration_dict['static-password']
+    # Check if the static username (str) are the same in the charm config and the service config
+    # Not comparing password because that is encrypted
+    assert list(harness.model.config['static-username']) == test_configuration_dict.get('staticPasswords')[0].get('username')
 
 @patch("charm.KubernetesServicePatch", lambda x, y: None)
 def test_disable_static_login_no_connector_blocked_status(harness):
