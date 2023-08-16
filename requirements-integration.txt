@@ -12,7 +12,7 @@ anyio==3.7.1
     # via httpcore
 asttokens==2.2.1
     # via stack-data
-async-timeout==4.0.2
+async-timeout==4.0.3
     # via aiohttp
 attrs==23.1.0
     # via
