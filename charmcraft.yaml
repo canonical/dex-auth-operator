@@ -12,3 +12,6 @@ bases:
 parts:
   charm:
     charm-python-packages: [setuptools, pip]
+    # Install rustc and cargo as build packages because some charm's
+    # dependencies need this to be built and installed from source.
+    build-packages: [rustc, cargo]
