@@ -1,6 +1,6 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+bcrypt
 jinja2
 # pin to <2 due to track/2.31 depends on <2
 ops<2
