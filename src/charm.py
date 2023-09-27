@@ -3,11 +3,11 @@
 # See LICENSE file for licensing details.
 
 import logging
-import subprocess
 from random import choices
 from string import ascii_letters
 from uuid import uuid4
 
+import bcrypt
 import yaml
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
@@ -18,14 +18,6 @@ from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import Layer
 from serialized_data_interface import NoVersionsListed, get_interface
-
-try:
-    import bcrypt
-except ImportError:
-    subprocess.check_call(["apt", "update"])
-    subprocess.check_call(["apt", "install", "-y", "python3-bcrypt"])
-    import bcrypt
-
 
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
