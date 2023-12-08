@@ -73,7 +73,7 @@ async def test_relations(ops_test: OpsTest):
 
     await ops_test.model.deploy(
         entity_url=istio_pilot,
-        channel="latest/edge",
+        channel="1.16/stable",
         config={"default-gateway": "kubeflow-gateway"},
         trust=True,
     )
@@ -81,7 +81,7 @@ async def test_relations(ops_test: OpsTest):
     await ops_test.model.deploy(
         entity_url="istio-gateway",
         application_name=istio_gateway,
-        channel="latest/edge",
+        channel="1.16/stable",
         config={"kind": "ingress"},
         trust=True,
     )
@@ -97,7 +97,7 @@ async def test_relations(ops_test: OpsTest):
         timeout=90 * 10,
     )
 
-    await ops_test.model.deploy(oidc_gatekeeper, channel="latest/edge", config=OIDC_CONFIG)
+    await ops_test.model.deploy(oidc_gatekeeper, channel="ckf-1.7/stable", config=OIDC_CONFIG)
     await ops_test.model.add_relation(oidc_gatekeeper, APP_NAME)
     await ops_test.model.add_relation(f"{istio_pilot}:ingress", f"{APP_NAME}:ingress")
     await ops_test.model.add_relation(
@@ -105,8 +105,8 @@ async def test_relations(ops_test: OpsTest):
         f"{oidc_gatekeeper}:ingress-auth",
     )
 
-    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge", trust=True)
-    await ops_test.model.deploy("kubeflow-dashboard", channel="latest/edge", trust=True)
+    await ops_test.model.deploy("kubeflow-profiles", channel="1.7/stable", trust=True)
+    await ops_test.model.deploy("kubeflow-dashboard", channel="1.7/stable", trust=True)
     await ops_test.model.add_relation("kubeflow-profiles", "kubeflow-dashboard")
     await ops_test.model.add_relation(f"{istio_pilot}:ingress", "kubeflow-dashboard:ingress")
 
