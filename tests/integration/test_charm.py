@@ -73,7 +73,7 @@ async def test_relations(ops_test: OpsTest):
 
     await ops_test.model.deploy(
         entity_url=istio_pilot,
-        channel="latest/edge",
+        channel="1.16/stable",
         config={"default-gateway": "kubeflow-gateway"},
         trust=True,
     )
@@ -81,7 +81,7 @@ async def test_relations(ops_test: OpsTest):
     await ops_test.model.deploy(
         entity_url="istio-gateway",
         application_name=istio_gateway,
-        channel="latest/edge",
+        channel="1.16/stable",
         config={"kind": "ingress"},
         trust=True,
     )
@@ -97,7 +97,7 @@ async def test_relations(ops_test: OpsTest):
         timeout=90 * 10,
     )
 
-    await ops_test.model.deploy(oidc_gatekeeper, channel="ckf-1.4/stable", config=OIDC_CONFIG)
+    await ops_test.model.deploy(oidc_gatekeeper, channel="ckf-1.7/stable", config=OIDC_CONFIG)
     await ops_test.model.add_relation(oidc_gatekeeper, APP_NAME)
     await ops_test.model.add_relation(f"{istio_pilot}:ingress", f"{APP_NAME}:ingress")
     await ops_test.model.add_relation(
@@ -105,10 +105,22 @@ async def test_relations(ops_test: OpsTest):
         f"{oidc_gatekeeper}:ingress-auth",
     )
 
-    await ops_test.model.deploy("kubeflow-profiles", channel="latest/edge", trust=True)
-    await ops_test.model.deploy("kubeflow-dashboard", channel="latest/edge", trust=True)
+    await ops_test.model.deploy("kubeflow-profiles", channel="1.7/stable", trust=True)
+    await ops_test.model.deploy("kubeflow-dashboard", channel="1.7/stable", trust=True)
     await ops_test.model.add_relation("kubeflow-profiles", "kubeflow-dashboard")
     await ops_test.model.add_relation(f"{istio_pilot}:ingress", "kubeflow-dashboard:ingress")
+
+    # Set public-url for dex and oidc
+    # Note: This could be affected by a race condition (if service has not received
+    # an IP yet, this could fail) but probably this won't happen in practice
+    # because that IP is delivered quickly and we wait_for_idle on the istio_gateway
+    public_url = get_public_url(
+        service_name="istio-ingressgateway-workload",
+        namespace=ops_test.model_name,
+    )
+    log.info(f"got public_url of {public_url}")
+    await ops_test.model.applications[APP_NAME].set_config({"public-url": public_url})
+    await ops_test.model.applications["oidc-gatekeeper"].set_config({"public-url": public_url})
 
     await ops_test.model.wait_for_idle(
         status="active",
@@ -118,18 +130,21 @@ async def test_relations(ops_test: OpsTest):
     )
 
 
-@pytest.fixture()
-async def driver(ops_test: OpsTest):
+def get_public_url(service_name: str, namespace: str):
     lightkube_client = lightkube.Client()
-    gateway_svc = lightkube_client.get(
-        Service, "istio-ingressgateway-workload", namespace=ops_test.model_name
-    )
+    gateway_svc = lightkube_client.get(Service, service_name, namespace=namespace)
 
     endpoint = gateway_svc.status.loadBalancer.ingress[0].ip
     url = f"http://{endpoint}.nip.io"
+    return url
 
-    await ops_test.model.applications[APP_NAME].set_config({"public-url": url})
-    await ops_test.model.applications["oidc-gatekeeper"].set_config({"public-url": url})
+
+@pytest.fixture()
+async def driver(ops_test: OpsTest):
+    public_url = get_public_url(
+        service_name="istio-ingressgateway-workload",
+        namespace=ops_test.model_name,
+    )
 
     # Oidc may get blocked and recreate the unit
     await ops_test.model.wait_for_idle(
@@ -148,14 +163,14 @@ async def driver(ops_test: OpsTest):
         wait = WebDriverWait(driver, 180, 1, (JavascriptException, StopIteration))
         for _ in range(60):
             try:
-                driver.get(url)
+                driver.get(public_url)
                 break
             except WebDriverException:
                 sleep(5)
         else:
-            driver.get(url)
+            driver.get(public_url)
 
-        yield driver, wait, url
+        yield driver, wait, public_url
 
         driver.get_screenshot_as_file("/tmp/selenium-dashboard.png")
 
