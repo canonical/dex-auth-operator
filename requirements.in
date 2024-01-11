@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 bcrypt
 charmed-kubeflow-chisme
+cosl
 jinja2
 lightkube
 ops
