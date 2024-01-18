@@ -97,7 +97,8 @@ async def test_relations(ops_test: OpsTest):
         timeout=90 * 10,
     )
 
-    await ops_test.model.deploy(oidc_gatekeeper, channel="latest/edge", config=OIDC_CONFIG)
+    # DEBUG: temporarily set channel to a ephemeral branch for testing
+    await ops_test.model.deploy(oidc_gatekeeper, channel="latest/edge/pr-128", config=OIDC_CONFIG)
     await ops_test.model.add_relation(oidc_gatekeeper, APP_NAME)
     await ops_test.model.add_relation(f"{istio_pilot}:ingress", f"{APP_NAME}:ingress")
     await ops_test.model.add_relation(
