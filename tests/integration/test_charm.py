@@ -241,6 +241,12 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
             assert response_metric["juju_application"] == APP_NAME
             assert response_metric["juju_model"] == ops_test.model_name
 
+            # Assert the unit is available by checking the query result
+            # The data is presented as a list [1707357912.349, '1'], where the
+            # first value is a timestamp and the second value is the state of the unit
+            # 1 means available, 0 means unavailable
+            assert response["data"]["result"][0]["value"][1] == "1"
+
 
 # Helper to retry calling a function over 30 seconds or 5 attempts
 retry_for_5_attempts = Retrying(
