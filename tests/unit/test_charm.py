@@ -17,7 +17,7 @@ def harness():
     return Harness(Operator)
 
 
-@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_not_leader(harness):
     harness.begin_with_initial_hooks()
     assert isinstance(harness.charm.model.unit.status, WaitingStatus)
@@ -36,7 +36,7 @@ def ensure_state(self):
     self.state.user_id = "123"
 
 
-@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 @patch("charm.Operator._update_layer")
 def test_install_event(update, harness):
     harness.set_leader(True)
@@ -55,7 +55,7 @@ def test_install_event(update, harness):
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
 
 
-@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_generate_dex_auth_config_raises(harness):
     """Check the method raises when static login is disabled and no connectors are provided."""
     harness.begin()
@@ -96,7 +96,7 @@ def test_generate_dex_auth_config_raises(harness):
 )
 @patch("charm.Operator._update_layer")
 @patch.object(Operator, "ensure_state", ensure_state)
-@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
     """Check the method returns dex-auth configuration when different settings are provided."""
     harness.set_leader(True)
@@ -125,7 +125,7 @@ def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
         assert harness.model.config["static-username"] == static_passwords[0].get("username")
 
 
-@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_disable_static_login_no_connector_blocked_status(harness):
     harness.set_leader(True)
     harness.begin()
@@ -141,7 +141,7 @@ def test_disable_static_login_no_connector_blocked_status(harness):
     assert isinstance(harness.charm.model.unit.status, BlockedStatus)
 
 
-@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 @patch("charm.Operator._update_layer")
 def test_config_changed(update, harness):
     harness.set_leader(True)
@@ -165,7 +165,7 @@ def test_config_changed(update, harness):
     assert new_config == config_updates
 
 
-@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 @patch("charm.Operator._update_layer")
 @patch.object(Operator, "ensure_state", ensure_state)
 def test_main_oidc(update, harness):
@@ -188,7 +188,7 @@ def test_main_oidc(update, harness):
     assert isinstance(harness.charm.model.unit.status, ActiveStatus)
 
 
-@patch("charm.KubernetesServicePatch", lambda x, y: None)
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 @patch("charm.Operator._update_layer")
 @patch.object(Operator, "ensure_state", ensure_state)
 def test_main_ingress(update, harness):

@@ -11,8 +11,9 @@ import bcrypt
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
+from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
@@ -32,6 +33,16 @@ class Operator(CharmBase):
 
         self.logger: logging.Logger = logging.getLogger(__name__)
 
+        # Patch the service to correctly expose the ports to be used
+        dex_port = ServicePort(int(self.model.config["port"]), name="dex")
+        metrics_port = ServicePort(int(METRICS_PORT), name="metrics-port")
+
+        self.service_patcher = KubernetesServicePatch(
+            self,
+            [dex_port, metrics_port],
+            service_name=f"{self.model.app.name}",
+        )
+
         self.prometheus_provider = MetricsEndpointProvider(
             charm=self,
             relation_name="metrics-endpoint",
@@ -50,10 +61,6 @@ class Operator(CharmBase):
         self._container = self.unit.get_container(self._container_name)
         self._entrypoint = "/usr/local/bin/docker-entrypoint"
         self._dex_config_path = "/etc/dex/config.docker.yaml"
-
-        self.service_patcher = KubernetesServicePatch(
-            self, [(self._container_name, self.model.config["port"])]
-        )
 
         for event in [
             self.on.install,
@@ -222,6 +229,7 @@ class Operator(CharmBase):
                 "issuer": f"{public_url}/dex",
                 "storage": {"type": "kubernetes", "config": {"inCluster": True}},
                 "web": {"http": f"0.0.0.0:{port}"},
+                "telemetry": {"http": "0.0.0.0:5558"},
                 "logger": {"level": "debug", "format": "text"},
                 "oauth2": {"skipApprovalScreen": True},
                 "staticClients": oidc_client_info,
