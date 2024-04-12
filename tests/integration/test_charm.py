@@ -67,7 +67,7 @@ async def test_relations(ops_test: OpsTest):
         entity_url=constants.ISTIO_PILOT,
         channel=constants.ISTIO_OPERATORS_CHANNEL,
         config=constants.ISTIO_PILOT_CONFIG,
-        trust=constants.ISTIO_PILOT_TRUE,
+        trust=constants.ISTIO_PILOT_TRUST,
     )
 
     await ops_test.model.deploy(
