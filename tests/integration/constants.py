@@ -45,6 +45,6 @@ PROMETHEUS_K8S_TRUST = True
 GRAFANA_K8S = "grafana-k8s"
 GRAFANA_K8S_CHANNEL = "1.0/stable"
 GRAFANA_K8S_TRUST = True
-PROMETHEUS_SCRAPE_K8S = "prometheus-scrape-k8s"
+PROMETHEUS_SCRAPE_K8S = "prometheus-scrape-config-k8s"
 PROMETHEUS_SCRAPE_K8S_CHANNEL = "1.0/stable"
 PROMETHEUS_SCRAPE_CONFIG = {"scrape_interval": "30s"}
