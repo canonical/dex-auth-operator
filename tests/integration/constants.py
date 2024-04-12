@@ -25,9 +25,11 @@ OIDC_GATEKEEPER_CONFIG = {
 ISTIO_OPERATORS_CHANNEL = "1.17/stable"
 ISTIO_PILOT = "istio-pilot"
 ISTIO_PILOT_TRUST = True
+ISTIO_PILOT_CONFIG = {"default-gateway": "kubeflow-gateway"}
 ISTIO_GATEWAY = "istio-gateway"
 ISTIO_GATEWAY_APP_NAME = "istio-ingressgateway"
 ISTIO_GATEWAY_TRUST = True
+ISTIO_GATEWAY_CONFIG = {"kind": "ingress"}
 
 KUBEFLOW_PROFILES = "kubeflow-profiles"
 KUBEFLOW_PROFILES_CHANNEL = "1.8/stable"

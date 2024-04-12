@@ -60,52 +60,60 @@ def test_statefulset_readiness(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_relations(ops_test: OpsTest):
-    oidc_gatekeeper = "oidc-gatekeeper"
-    istio_pilot = "istio-pilot"
-    istio_gateway = "istio-ingressgateway"
-
     await ops_test.model.deploy(
-        entity_url=istio_pilot,
-        channel="1.17/stable",
-        config={"default-gateway": "kubeflow-gateway"},
-        trust=True,
+        entity_url=constants.ISTIO_PILOT,
+        channel=constants.ISTIO_OPERATORS_CHANNEL,
+        config=constants.ISTIO_PILOT_CONFIG,
+        trust=constants.ISTIO_PILOT_TRUE,
     )
 
     await ops_test.model.deploy(
-        entity_url="istio-gateway",
-        application_name=istio_gateway,
-        channel="1.17/stable",
-        config={"kind": "ingress"},
-        trust=True,
+        entity_url=constants.ISTIO_GATEWAY,
+        application_name=constants.ISTIO_GATEWAY_APP_NAME,
+        channel=constants.ISTIO_OPERATORS_CHANNEL,
+        config=constants.ISTIO_GATEWAY_CONFIG,
+        trust=constants.ISTIO_GATEWAY_TRUST,
     )
     await ops_test.model.add_relation(
-        istio_pilot,
-        istio_gateway,
+        constants.ISTIO_PILOT,
+        constants.ISTIO_GATEWAY_APP_NAME,
     )
 
     await ops_test.model.wait_for_idle(
-        [istio_pilot, istio_gateway],
+        [constants.ISTIO_PILOT, constants.ISTIO_GATEWAY_APP_NAME],
         raise_on_blocked=False,
         status="active",
         timeout=90 * 10,
     )
 
     await ops_test.model.deploy(
-        oidc_gatekeeper, channel="ckf-1.8/stable", config=constants.OIDC_CONFIG
+        constants.OIDC_GATEKEEPER,
+        channel=constants.OIDC_GATEKEEPER_CHANNEL,
+        config=constants.OIDC_GATEKEEPER_CONFIG,
     )
-    await ops_test.model.add_relation(oidc_gatekeeper, constants.DEX_AUTH_APP_NAME)
+    await ops_test.model.add_relation(constants.OIDC_GATEKEEPER, constants.DEX_AUTH_APP_NAME)
     await ops_test.model.add_relation(
-        f"{istio_pilot}:ingress", f"{constants.DEX_AUTH_APP_NAME}:ingress"
+        f"{constants.ISTIO_PILOT}:ingress", f"{constants.DEX_AUTH_APP_NAME}:ingress"
     )
     await ops_test.model.add_relation(
-        f"{istio_pilot}:ingress-auth",
-        f"{oidc_gatekeeper}:ingress-auth",
+        f"{constants.ISTIO_PILOT}:ingress-auth",
+        f"{constants.OIDC_GATEKEEPER}:ingress-auth",
     )
 
-    await ops_test.model.deploy("kubeflow-profiles", channel="1.8/stable", trust=True)
-    await ops_test.model.deploy("kubeflow-dashboard", channel="1.8/stable", trust=True)
-    await ops_test.model.add_relation("kubeflow-profiles", "kubeflow-dashboard")
-    await ops_test.model.add_relation(f"{istio_pilot}:ingress", "kubeflow-dashboard:ingress")
+    await ops_test.model.deploy(
+        constants.KUBEFLOW_PROFILES,
+        channel=constants.KUBEFLOW_PROFILES_CHANNEL,
+        trust=constants.KUBEFLOW_PROFILES,
+    )
+    await ops_test.model.deploy(
+        constants.KUBEFLOW_DASHBOARD,
+        channel=constants.KUBEFLOW_DASHBOARD_CHANNEL,
+        trust=constants.KUBEFLOW_DASHBOARD,
+    )
+    await ops_test.model.add_relation(constants.KUBEFLOW_PROFILES, constants.KUBEFLOW_DASHBOARD)
+    await ops_test.model.add_relation(
+        f"{constants.ISTIO_PILOT}:ingress", f"{constants.KUBEFLOW_DASHBOARD,}:ingress"
+    )
 
     # Set public-url for dex and oidc
     # Note: This could be affected by a race condition (if service has not received
@@ -119,7 +127,9 @@ async def test_relations(ops_test: OpsTest):
     await ops_test.model.applications[constants.DEX_AUTH_APP_NAME].set_config(
         {"public-url": public_url}
     )
-    await ops_test.model.applications["oidc-gatekeeper"].set_config({"public-url": public_url})
+    await ops_test.model.applications[constants.OIDC_GATEKEEPER].set_config(
+        {"public-url": public_url}
+    )
 
     await ops_test.model.wait_for_idle(
         status="active",
@@ -147,7 +157,7 @@ async def driver(ops_test: OpsTest):
 
     # Oidc may get blocked and recreate the unit
     await ops_test.model.wait_for_idle(
-        [constants.DEX_AUTH_APP_NAME, "oidc-gatekeeper"],
+        [constants.DEX_AUTH_APP_NAME, constants.OIDC_GATEKEEPER],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -212,15 +222,13 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
         config=constants.PROMETHEUS_SCRAPE_CONFIG,
     )
 
-    await ops_test.model.add_relation(
-        constants.constants.DEX_AUTH_APP_NAME, constants.PROMETHEUS_SCRAPE_K8S
-    )
+    await ops_test.model.add_relation(constants.DEX_AUTH_APP_NAME, constants.PROMETHEUS_SCRAPE_K8S)
     await ops_test.model.add_relation(
         f"{constants.PROMETHEUS_K8S}:grafana-dashboard",
         f"{constants.GRAFANA_K8S}:grafana-dashboard",
     )
     await ops_test.model.add_relation(
-        f"{constants.constants.DEX_AUTH_APP_NAME}:grafana-dashboard",
+        f"{constants.DEX_AUTH_APP_NAME}:grafana-dashboard",
         f"{constants.GRAFANA_K8S}:grafana-dashboard",
     )
     await ops_test.model.add_relation(
@@ -243,7 +251,7 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
         with attempt:
             r = requests.get(
                 f"http://{prometheus_unit_ip}:9090/api/v1/query?"
-                f'query=up{{juju_application="{constants.constants.DEX_AUTH_APP_NAME}"}}'
+                f'query=up{{juju_application="{constants.DEX_AUTH_APP_NAME}"}}'
             )
             response = json.loads(r.content.decode("utf-8"))
             response_status = response["status"]
@@ -251,7 +259,7 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
             assert response_status == "success"
 
             response_metric = response["data"]["result"][0]["metric"]
-            assert response_metric["juju_application"] == constants.constants.DEX_AUTH_APP_NAME
+            assert response_metric["juju_application"] == constants.DEX_AUTH_APP_NAME
             assert response_metric["juju_model"] == ops_test.model_name
 
             # Assert the unit is available by checking the query result
