@@ -30,7 +30,7 @@ async def test_build_and_deploy(ops_test):
     await ops_test.model.deploy(
         my_charm,
         resources={"oci-image": dex_image_path},
-        trust=True,
+        trust=constants.DEX_AUTH_TRUST,
         config=constants.DEX_AUTH_CONFIG,
     )
     await ops_test.model.wait_for_idle(
@@ -106,12 +106,12 @@ async def test_relations(ops_test: OpsTest):
     await ops_test.model.deploy(
         constants.KUBEFLOW_PROFILES,
         channel=constants.KUBEFLOW_PROFILES_CHANNEL,
-        trust=constants.KUBEFLOW_PROFILES,
+        trust=constants.KUBEFLOW_PROFILES_TRUST,
     )
     await ops_test.model.deploy(
         constants.KUBEFLOW_DASHBOARD,
         channel=constants.KUBEFLOW_DASHBOARD_CHANNEL,
-        trust=constants.KUBEFLOW_DASHBOARD,
+        trust=constants.KUBEFLOW_DASHBOARD_TRUST,
     )
     await ops_test.model.add_relation(constants.KUBEFLOW_PROFILES, constants.KUBEFLOW_DASHBOARD)
     await ops_test.model.add_relation(
