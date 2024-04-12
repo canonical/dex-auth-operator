@@ -28,7 +28,10 @@ async def test_build_and_deploy(ops_test):
     my_charm = await ops_test.build_charm(".")
     dex_image_path = constants.METADATA["resources"]["oci-image"]["upstream-source"]
     await ops_test.model.deploy(
-        my_charm, resources={"oci-image": dex_image_path}, trust=True, config=constants.DEX_CONFIG
+        my_charm,
+        resources={"oci-image": dex_image_path},
+        trust=True,
+        config=constants.DEX_AUTH_CONFIG,
     )
     await ops_test.model.wait_for_idle(
         apps=[constants.DEX_AUTH_APP_NAME], status="active", raise_on_blocked=True, timeout=600
@@ -194,8 +197,8 @@ def test_login(driver):
 
     driver.get_screenshot_as_file("/tmp/selenium-logon.png")
     # Log in using dex credentials
-    driver.find_element(By.ID, "login").send_keys(constants.DEX_CONFIG["static-username"])
-    driver.find_element(By.ID, "password").send_keys(constants.DEX_CONFIG["static-password"])
+    driver.find_element(By.ID, "login").send_keys(constants.DEX_AUTH_CONFIG["static-username"])
+    driver.find_element(By.ID, "password").send_keys(constants.DEX_AUTH_CONFIG["static-password"])
     driver.find_element(By.ID, "submit-login").click()
 
     # Check if main page was loaded
