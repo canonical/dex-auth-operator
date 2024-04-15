@@ -3,11 +3,13 @@
 
 import json
 import logging
+from pathlib import Path
 from time import sleep
 
 import lightkube
 import pytest
 import requests
+import yaml
 from lightkube.resources.apps_v1 import StatefulSet
 from lightkube.resources.core_v1 import Service
 from pytest_operator.plugin import OpsTest
@@ -18,28 +20,66 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
-from . import constants
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+CHARM_ROOT = "."
+DEX_AUTH = "dex-auth"
+DEX_AUTH_APP_NAME = METADATA["name"]
+DEX_AUTH_TRUST = True
+DEX_AUTH_CONFIG = {
+    "static-username": "admin",
+    "static-password": "foobar",
+}
 
+OIDC_GATEKEEPER = "oidc-gatekeeper"
+OIDC_GATEKEEPER_CHANNEL = "latest/edge"
+OIDC_GATEKEEPER_CONFIG = {
+    "client-name": "Ambassador Auth OIDC",
+    "client-secret": "oidc-client-secret",
+}
+
+ISTIO_OPERATORS_CHANNEL = "latest/edge"
+ISTIO_PILOT = "istio-pilot"
+ISTIO_PILOT_TRUST = True
+ISTIO_PILOT_CONFIG = {"default-gateway": "kubeflow-gateway"}
+ISTIO_GATEWAY = "istio-gateway"
+ISTIO_GATEWAY_APP_NAME = "istio-ingressgateway"
+ISTIO_GATEWAY_TRUST = True
+ISTIO_GATEWAY_CONFIG = {"kind": "ingress"}
+
+KUBEFLOW_PROFILES = "kubeflow-profiles"
+KUBEFLOW_PROFILES_CHANNEL = "latest/edge"
+KUBEFLOW_PROFILES_TRUST = True
+
+KUBEFLOW_DASHBOARD = "kubeflow-dashboard"
+KUBEFLOW_DASHBOARD_CHANNEL = "latest/edge"
+KUBEFLOW_DASHBOARD_TRUST = True
+
+PROMETHEUS_K8S = "prometheus-k8s"
+PROMETHEUS_K8S_CHANNEL = "1.0/stable"
+PROMETHEUS_K8S_TRUST = True
+GRAFANA_K8S = "grafana-k8s"
+GRAFANA_K8S_CHANNEL = "1.0/stable"
+GRAFANA_K8S_TRUST = True
+PROMETHEUS_SCRAPE_K8S = "prometheus-scrape-config-k8s"
+PROMETHEUS_SCRAPE_K8S_CHANNEL = "1.0/stable"
+PROMETHEUS_SCRAPE_CONFIG = {"scrape_interval": "30s"}
 log = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test):
     my_charm = await ops_test.build_charm(".")
-    dex_image_path = constants.METADATA["resources"]["oci-image"]["upstream-source"]
+    dex_image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     await ops_test.model.deploy(
         my_charm,
         resources={"oci-image": dex_image_path},
-        trust=constants.DEX_AUTH_TRUST,
-        config=constants.DEX_AUTH_CONFIG,
+        trust=DEX_AUTH_TRUST,
+        config=DEX_AUTH_CONFIG,
     )
     await ops_test.model.wait_for_idle(
-        apps=[constants.DEX_AUTH_APP_NAME], status="active", raise_on_blocked=True, timeout=600
+        apps=[DEX_AUTH_APP_NAME], status="active", raise_on_blocked=True, timeout=600
     )
-    assert (
-        ops_test.model.applications[constants.DEX_AUTH_APP_NAME].units[0].workload_status
-        == "active"
-    )
+    assert ops_test.model.applications[DEX_AUTH_APP_NAME].units[0].workload_status == "active"
 
 
 @pytest.mark.abort_on_fail
@@ -52,7 +92,7 @@ def test_statefulset_readiness(ops_test: OpsTest):
         )
         with attempt:
             statefulset = lightkube_client.get(
-                StatefulSet, constants.DEX_AUTH_APP_NAME, namespace=ops_test.model_name
+                StatefulSet, DEX_AUTH_APP_NAME, namespace=ops_test.model_name
             )
 
             expected_replicas = statefulset.spec.replicas
@@ -64,59 +104,55 @@ def test_statefulset_readiness(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_relations(ops_test: OpsTest):
     await ops_test.model.deploy(
-        entity_url=constants.ISTIO_PILOT,
-        channel=constants.ISTIO_OPERATORS_CHANNEL,
-        config=constants.ISTIO_PILOT_CONFIG,
-        trust=constants.ISTIO_PILOT_TRUST,
+        entity_url=ISTIO_PILOT,
+        channel=ISTIO_OPERATORS_CHANNEL,
+        config=ISTIO_PILOT_CONFIG,
+        trust=ISTIO_PILOT_TRUST,
     )
 
     await ops_test.model.deploy(
-        entity_url=constants.ISTIO_GATEWAY,
-        application_name=constants.ISTIO_GATEWAY_APP_NAME,
-        channel=constants.ISTIO_OPERATORS_CHANNEL,
-        config=constants.ISTIO_GATEWAY_CONFIG,
-        trust=constants.ISTIO_GATEWAY_TRUST,
+        entity_url=ISTIO_GATEWAY,
+        application_name=ISTIO_GATEWAY_APP_NAME,
+        channel=ISTIO_OPERATORS_CHANNEL,
+        config=ISTIO_GATEWAY_CONFIG,
+        trust=ISTIO_GATEWAY_TRUST,
     )
     await ops_test.model.add_relation(
-        constants.ISTIO_PILOT,
-        constants.ISTIO_GATEWAY_APP_NAME,
+        ISTIO_PILOT,
+        ISTIO_GATEWAY_APP_NAME,
     )
 
     await ops_test.model.wait_for_idle(
-        [constants.ISTIO_PILOT, constants.ISTIO_GATEWAY_APP_NAME],
+        [ISTIO_PILOT, ISTIO_GATEWAY_APP_NAME],
         raise_on_blocked=False,
         status="active",
         timeout=90 * 10,
     )
 
     await ops_test.model.deploy(
-        constants.OIDC_GATEKEEPER,
-        channel=constants.OIDC_GATEKEEPER_CHANNEL,
-        config=constants.OIDC_GATEKEEPER_CONFIG,
+        OIDC_GATEKEEPER,
+        channel=OIDC_GATEKEEPER_CHANNEL,
+        config=OIDC_GATEKEEPER_CONFIG,
     )
-    await ops_test.model.add_relation(constants.OIDC_GATEKEEPER, constants.DEX_AUTH_APP_NAME)
+    await ops_test.model.add_relation(OIDC_GATEKEEPER, DEX_AUTH_APP_NAME)
+    await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{DEX_AUTH_APP_NAME}:ingress")
     await ops_test.model.add_relation(
-        f"{constants.ISTIO_PILOT}:ingress", f"{constants.DEX_AUTH_APP_NAME}:ingress"
-    )
-    await ops_test.model.add_relation(
-        f"{constants.ISTIO_PILOT}:ingress-auth",
-        f"{constants.OIDC_GATEKEEPER}:ingress-auth",
+        f"{ISTIO_PILOT}:ingress-auth",
+        f"{OIDC_GATEKEEPER}:ingress-auth",
     )
 
     await ops_test.model.deploy(
-        constants.KUBEFLOW_PROFILES,
-        channel=constants.KUBEFLOW_PROFILES_CHANNEL,
-        trust=constants.KUBEFLOW_PROFILES_TRUST,
+        KUBEFLOW_PROFILES,
+        channel=KUBEFLOW_PROFILES_CHANNEL,
+        trust=KUBEFLOW_PROFILES_TRUST,
     )
     await ops_test.model.deploy(
-        constants.KUBEFLOW_DASHBOARD,
-        channel=constants.KUBEFLOW_DASHBOARD_CHANNEL,
-        trust=constants.KUBEFLOW_DASHBOARD_TRUST,
+        KUBEFLOW_DASHBOARD,
+        channel=KUBEFLOW_DASHBOARD_CHANNEL,
+        trust=KUBEFLOW_DASHBOARD_TRUST,
     )
-    await ops_test.model.add_relation(constants.KUBEFLOW_PROFILES, constants.KUBEFLOW_DASHBOARD)
-    await ops_test.model.add_relation(
-        f"{constants.ISTIO_PILOT}:ingress", f"{constants.KUBEFLOW_DASHBOARD,}:ingress"
-    )
+    await ops_test.model.add_relation(KUBEFLOW_PROFILES, KUBEFLOW_DASHBOARD)
+    await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{KUBEFLOW_DASHBOARD,}:ingress")
 
     # Set public-url for dex and oidc
     # Note: This could be affected by a race condition (if service has not received
@@ -127,12 +163,8 @@ async def test_relations(ops_test: OpsTest):
         namespace=ops_test.model_name,
     )
     log.info(f"got public_url of {public_url}")
-    await ops_test.model.applications[constants.DEX_AUTH_APP_NAME].set_config(
-        {"public-url": public_url}
-    )
-    await ops_test.model.applications[constants.OIDC_GATEKEEPER].set_config(
-        {"public-url": public_url}
-    )
+    await ops_test.model.applications[DEX_AUTH_APP_NAME].set_config({"public-url": public_url})
+    await ops_test.model.applications[OIDC_GATEKEEPER].set_config({"public-url": public_url})
 
     await ops_test.model.wait_for_idle(
         status="active",
@@ -160,7 +192,7 @@ async def driver(ops_test: OpsTest):
 
     # Oidc may get blocked and recreate the unit
     await ops_test.model.wait_for_idle(
-        [constants.DEX_AUTH_APP_NAME, constants.OIDC_GATEKEEPER],
+        [DEX_AUTH_APP_NAME, OIDC_GATEKEEPER],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -197,8 +229,8 @@ def test_login(driver):
 
     driver.get_screenshot_as_file("/tmp/selenium-logon.png")
     # Log in using dex credentials
-    driver.find_element(By.ID, "login").send_keys(constants.DEX_AUTH_CONFIG["static-username"])
-    driver.find_element(By.ID, "password").send_keys(constants.DEX_AUTH_CONFIG["static-password"])
+    driver.find_element(By.ID, "login").send_keys(DEX_AUTH_CONFIG["static-username"])
+    driver.find_element(By.ID, "password").send_keys(DEX_AUTH_CONFIG["static-password"])
     driver.find_element(By.ID, "submit-login").click()
 
     # Check if main page was loaded
@@ -210,41 +242,41 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
     """Deploy prometheus, grafana and required relations, then test the metrics."""
     # Deploy and relate prometheus
     await ops_test.model.deploy(
-        constants.PROMETHEUS_K8S,
-        channel=constants.PROMETHEUS_K8S_CHANNEL,
-        trust=constants.PROMETHEUS_K8S_TRUST,
+        PROMETHEUS_K8S,
+        channel=PROMETHEUS_K8S_CHANNEL,
+        trust=PROMETHEUS_K8S_TRUST,
     )
     await ops_test.model.deploy(
-        constants.GRAFANA_K8S,
-        channel=constants.GRAFANA_K8S_CHANNEL,
-        trust=constants.GRAFANA_K8S_TRUST,
+        GRAFANA_K8S,
+        channel=GRAFANA_K8S_CHANNEL,
+        trust=GRAFANA_K8S_TRUST,
     )
     await ops_test.model.deploy(
-        constants.PROMETHEUS_SCRAPE_K8S,
-        channel=constants.PROMETHEUS_SCRAPE_K8S_CHANNEL,
-        config=constants.PROMETHEUS_SCRAPE_CONFIG,
+        PROMETHEUS_SCRAPE_K8S,
+        channel=PROMETHEUS_SCRAPE_K8S_CHANNEL,
+        config=PROMETHEUS_SCRAPE_CONFIG,
     )
 
-    await ops_test.model.add_relation(constants.DEX_AUTH_APP_NAME, constants.PROMETHEUS_SCRAPE_K8S)
+    await ops_test.model.add_relation(DEX_AUTH_APP_NAME, PROMETHEUS_SCRAPE_K8S)
     await ops_test.model.add_relation(
-        f"{constants.PROMETHEUS_K8S}:grafana-dashboard",
-        f"{constants.GRAFANA_K8S}:grafana-dashboard",
+        f"{PROMETHEUS_K8S}:grafana-dashboard",
+        f"{GRAFANA_K8S}:grafana-dashboard",
     )
     await ops_test.model.add_relation(
-        f"{constants.DEX_AUTH_APP_NAME}:grafana-dashboard",
-        f"{constants.GRAFANA_K8S}:grafana-dashboard",
+        f"{DEX_AUTH_APP_NAME}:grafana-dashboard",
+        f"{GRAFANA_K8S}:grafana-dashboard",
     )
     await ops_test.model.add_relation(
-        f"{constants.PROMETHEUS_K8S}:metrics-endpoint",
-        f"{constants.PROMETHEUS_SCRAPE_K8S}:metrics-endpoint",
+        f"{PROMETHEUS_K8S}:metrics-endpoint",
+        f"{PROMETHEUS_SCRAPE_K8S}:metrics-endpoint",
     )
 
     await ops_test.model.wait_for_idle(status="active", timeout=60 * 20)
 
     status = await ops_test.model.get_status()
-    prometheus_unit_ip = status["applications"][constants.PROMETHEUS_K8S]["units"][
-        f"{constants.PROMETHEUS_K8S}/0"
-    ]["address"]
+    prometheus_unit_ip = status["applications"][PROMETHEUS_K8S]["units"][f"{PROMETHEUS_K8S}/0"][
+        "address"
+    ]
     log.info(f"Prometheus available at http://{prometheus_unit_ip}:9090")
 
     for attempt in retry_for_5_attempts:
@@ -254,7 +286,7 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
         with attempt:
             r = requests.get(
                 f"http://{prometheus_unit_ip}:9090/api/v1/query?"
-                f'query=up{{juju_application="{constants.DEX_AUTH_APP_NAME}"}}'
+                f'query=up{{juju_application="{DEX_AUTH_APP_NAME}"}}'
             )
             response = json.loads(r.content.decode("utf-8"))
             response_status = response["status"]
@@ -262,7 +294,7 @@ async def test_prometheus_grafana_integration(ops_test: OpsTest):
             assert response_status == "success"
 
             response_metric = response["data"]["result"][0]["metric"]
-            assert response_metric["juju_application"] == constants.DEX_AUTH_APP_NAME
+            assert response_metric["juju_application"] == DEX_AUTH_APP_NAME
             assert response_metric["juju_model"] == ops_test.model_name
 
             # Assert the unit is available by checking the query result
