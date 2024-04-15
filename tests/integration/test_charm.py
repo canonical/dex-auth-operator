@@ -152,7 +152,7 @@ async def test_relations(ops_test: OpsTest):
         trust=KUBEFLOW_DASHBOARD_TRUST,
     )
     await ops_test.model.add_relation(KUBEFLOW_PROFILES, KUBEFLOW_DASHBOARD)
-    await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{KUBEFLOW_DASHBOARD,}:ingress")
+    await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{KUBEFLOW_DASHBOARD}:ingress")
 
     # Set public-url for dex and oidc
     # Note: This could be affected by a race condition (if service has not received
