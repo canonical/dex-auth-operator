@@ -44,7 +44,7 @@ tomli==2.0.1
     # via
     #   black
     #   pyproject-flake8
-typing-extensions==4.11.0
+typing-extensions==4.7.1
     # via black
 
 # The following packages are considered to be unsafe in a requirements file:
