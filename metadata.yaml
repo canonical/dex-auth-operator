@@ -85,4 +85,4 @@ resources:
   oci-image:
     type: oci-image
     description: OCI image for dex container
-    upstream-source: charmedkubeflow/dex:2.36.0-f262d95
+    upstream-source: ghcr.io/dexidp/dex:v2.39.1
