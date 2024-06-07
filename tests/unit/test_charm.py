@@ -18,6 +18,13 @@ def harness():
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+def test_log_forwarding(harness):
+    with patch("charm.LogForwarder") as mock_logging:
+        harness.begin()
+        mock_logging.assert_called_once_with(charm=harness.charm, relation_name="logging")
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_not_leader(harness):
     harness.begin_with_initial_hooks()
     assert isinstance(harness.charm.model.unit.status, WaitingStatus)

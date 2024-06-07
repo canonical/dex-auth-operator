@@ -1,15 +1,21 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import json
 import logging
 from pathlib import Path
 from time import sleep
 
 import lightkube
 import pytest
-import requests
 import yaml
+from charmed_kubeflow_chisme.testing import (
+    GRAFANA_AGENT_APP,
+    assert_alert_rules,
+    assert_logging,
+    assert_metrics_endpoint,
+    deploy_and_assert_grafana_agent,
+    get_alert_rules,
+)
 from lightkube.resources.apps_v1 import StatefulSet
 from lightkube.resources.core_v1 import Service
 from pytest_operator.plugin import OpsTest
@@ -54,15 +60,6 @@ KUBEFLOW_DASHBOARD = "kubeflow-dashboard"
 KUBEFLOW_DASHBOARD_CHANNEL = "latest/edge"
 KUBEFLOW_DASHBOARD_TRUST = True
 
-PROMETHEUS_K8S = "prometheus-k8s"
-PROMETHEUS_K8S_CHANNEL = "latest/stable"
-PROMETHEUS_K8S_TRUST = True
-GRAFANA_K8S = "grafana-k8s"
-GRAFANA_K8S_CHANNEL = "latest/stable"
-GRAFANA_K8S_TRUST = True
-PROMETHEUS_SCRAPE_K8S = "prometheus-scrape-config-k8s"
-PROMETHEUS_SCRAPE_K8S_CHANNEL = "latest/stable"
-PROMETHEUS_SCRAPE_CONFIG = {"scrape_interval": "30s"}
 log = logging.getLogger(__name__)
 
 
@@ -80,6 +77,11 @@ async def test_build_and_deploy(ops_test):
         apps=[DEX_AUTH_APP_NAME], status="active", raise_on_blocked=True, timeout=600
     )
     assert ops_test.model.applications[DEX_AUTH_APP_NAME].units[0].workload_status == "active"
+
+    # Deploying grafana-agent-k8s and add all relations
+    await deploy_and_assert_grafana_agent(
+        ops_test.model, DEX_AUTH_APP_NAME, metrics=True, dashboard=True, logging=True
+    )
 
 
 @pytest.mark.abort_on_fail
@@ -238,70 +240,29 @@ def test_login(driver):
     wait.until(lambda x: x.execute_script(script))
 
 
-async def test_prometheus_grafana_integration(ops_test: OpsTest):
-    """Deploy prometheus, grafana and required relations, then test the metrics."""
-    # Deploy and relate prometheus
-    await ops_test.model.deploy(
-        PROMETHEUS_K8S,
-        channel=PROMETHEUS_K8S_CHANNEL,
-        trust=PROMETHEUS_K8S_TRUST,
-    )
-    await ops_test.model.deploy(
-        GRAFANA_K8S,
-        channel=GRAFANA_K8S_CHANNEL,
-        trust=GRAFANA_K8S_TRUST,
-    )
-    await ops_test.model.deploy(
-        PROMETHEUS_SCRAPE_K8S,
-        channel=PROMETHEUS_SCRAPE_K8S_CHANNEL,
-        config=PROMETHEUS_SCRAPE_CONFIG,
-    )
+async def test_alert_rules(ops_test):
+    """Test check charm alert rules and rules defined in relation data bag."""
+    app = ops_test.model.applications[DEX_AUTH_APP_NAME]
+    alert_rules = get_alert_rules()
+    log.info("found alert_rules: %s", alert_rules)
+    await assert_alert_rules(app, alert_rules)
 
-    await ops_test.model.add_relation(DEX_AUTH_APP_NAME, PROMETHEUS_SCRAPE_K8S)
-    await ops_test.model.add_relation(
-        f"{PROMETHEUS_K8S}:grafana-dashboard",
-        f"{GRAFANA_K8S}:grafana-dashboard",
-    )
-    await ops_test.model.add_relation(
-        f"{DEX_AUTH_APP_NAME}:grafana-dashboard",
-        f"{GRAFANA_K8S}:grafana-dashboard",
-    )
-    await ops_test.model.add_relation(
-        f"{PROMETHEUS_K8S}:metrics-endpoint",
-        f"{PROMETHEUS_SCRAPE_K8S}:metrics-endpoint",
-    )
 
-    await ops_test.model.wait_for_idle(status="active", timeout=60 * 20)
+async def test_metrics_enpoint(ops_test):
+    """Test metrics_endpoints are defined in relation data bag and their accessibility.
 
-    status = await ops_test.model.get_status()
-    prometheus_unit_ip = status["applications"][PROMETHEUS_K8S]["units"][f"{PROMETHEUS_K8S}/0"][
-        "address"
-    ]
-    log.info(f"Prometheus available at http://{prometheus_unit_ip}:9090")
+    This function gets all the metrics_endpoints from the relation data bag, checks if
+    they are available from the grafana-agent-k8s charm and finally compares them with the
+    ones provided to the function.
+    """
+    app = ops_test.model.applications[DEX_AUTH_APP_NAME]
+    await assert_metrics_endpoint(app, metrics_port=5558, metrics_path="/metrics")
 
-    for attempt in retry_for_5_attempts:
-        log.info(
-            f"Testing prometheus deployment (attempt " f"{attempt.retry_state.attempt_number})"
-        )
-        with attempt:
-            r = requests.get(
-                f"http://{prometheus_unit_ip}:9090/api/v1/query?"
-                f'query=up{{juju_application="{DEX_AUTH_APP_NAME}"}}'
-            )
-            response = json.loads(r.content.decode("utf-8"))
-            response_status = response["status"]
-            log.info(f"Response status is {response_status}")
-            assert response_status == "success"
 
-            response_metric = response["data"]["result"][0]["metric"]
-            assert response_metric["juju_application"] == DEX_AUTH_APP_NAME
-            assert response_metric["juju_model"] == ops_test.model_name
-
-            # Assert the unit is available by checking the query result
-            # The data is presented as a list [1707357912.349, '1'], where the
-            # first value is a timestamp and the second value is the state of the unit
-            # 1 means available, 0 means unavailable
-            assert response["data"]["result"][0]["value"][1] == "1"
+async def test_logging(ops_test):
+    """Test logging is defined in relation data bag."""
+    app = ops_test.model.applications[GRAFANA_AGENT_APP]
+    await assert_logging(app)
 
 
 # Helper to retry calling a function over 30 seconds or 5 attempts

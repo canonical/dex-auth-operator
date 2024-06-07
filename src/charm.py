@@ -11,6 +11,7 @@ import bcrypt
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube.models.core_v1 import ServicePort
@@ -23,6 +24,7 @@ from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, ge
 
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
+LOGGING_RELATION_NAME = "logging"
 
 
 class Operator(CharmBase):
@@ -53,6 +55,7 @@ class Operator(CharmBase):
                 }
             ],
         )
+        self._logging = LogForwarder(charm=self, relation_name=LOGGING_RELATION_NAME)
 
         self.dashboard_provider = GrafanaDashboardProvider(self)
 
