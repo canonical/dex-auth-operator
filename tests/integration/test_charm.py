@@ -76,7 +76,6 @@ async def test_build_and_deploy(ops_test):
     await ops_test.model.wait_for_idle(
         apps=[DEX_AUTH_APP_NAME], status="active", raise_on_blocked=True, timeout=600
     )
-    assert ops_test.model.applications[DEX_AUTH_APP_NAME].units[0].workload_status == "active"
 
     # Deploying grafana-agent-k8s and add all relations
     await deploy_and_assert_grafana_agent(
@@ -169,6 +168,14 @@ async def test_relations(ops_test: OpsTest):
     await ops_test.model.applications[OIDC_GATEKEEPER].set_config({"public-url": public_url})
 
     await ops_test.model.wait_for_idle(
+        apps=[
+            DEX_AUTH_APP_NAME,
+            ISTIO_PILOT,
+            ISTIO_GATEWAY_APP_NAME,
+            OIDC_GATEKEEPER,
+            KUBEFLOW_PROFILES,
+            KUBEFLOW_DASHBOARD,
+        ],
         status="active",
         raise_on_blocked=False,
         raise_on_error=True,

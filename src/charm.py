@@ -24,7 +24,6 @@ from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, ge
 
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
-LOGGING_RELATION_NAME = "logging"
 
 
 class Operator(CharmBase):
@@ -55,9 +54,8 @@ class Operator(CharmBase):
                 }
             ],
         )
-        self._logging = LogForwarder(charm=self, relation_name=LOGGING_RELATION_NAME)
-
         self.dashboard_provider = GrafanaDashboardProvider(self)
+        self._logging = LogForwarder(charm=self)
 
         self._container_name = "dex"
         self._namespace = self.model.name

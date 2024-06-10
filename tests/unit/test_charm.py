@@ -21,7 +21,7 @@ def harness():
 def test_log_forwarding(harness):
     with patch("charm.LogForwarder") as mock_logging:
         harness.begin()
-        mock_logging.assert_called_once_with(charm=harness.charm, relation_name="logging")
+        mock_logging.assert_called_once_with(charm=harness.charm)
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
