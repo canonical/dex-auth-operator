@@ -10,3 +10,5 @@ requests
 selenium<4.11
 selenium-wire
 tenacity
+# This is required due to the abstraction of cos integration
+charmed-kubeflow-chisme>=0.4.0

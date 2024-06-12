@@ -11,6 +11,7 @@ import bcrypt
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube.models.core_v1 import ServicePort
@@ -53,8 +54,8 @@ class Operator(CharmBase):
                 }
             ],
         )
-
         self.dashboard_provider = GrafanaDashboardProvider(self)
+        self._logging = LogForwarder(charm=self)
 
         self._container_name = "dex"
         self._namespace = self.model.name
