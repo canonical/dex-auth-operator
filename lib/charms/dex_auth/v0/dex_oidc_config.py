@@ -4,7 +4,95 @@
 
 """Library for sharing Dex's OIDC configuration with OIDC clients.
 
-TODO
+This library offers a Python API for providing and requesting information about
+Dex's OIDC configuration.
+The default relation name is `dex-oidc-config` and it's recommended to use that name,
+though if changed, you must ensure to pass the correct name when instantiating the
+provider and requirer classes, as well as in `metadata.yaml`.
+
+## Getting Started
+
+### Fetching the library with charmcraft
+
+Using charmcraft you can:
+```shell
+charmcraft fetch-lib charms.dex_auth.v0.dex_oidc_config
+
+
+## Using the library as requirer
+
+### Add relation to metadata.yaml
+```yaml
+requires:
+  dex-oidc-config:
+    interface: dex-oidc-config
+    limit: 1
+```
+
+### Instantiate the DexOidcConfigRequirer class in charm.py
+
+```python
+from ops.charm import CharmBase
+from charms.dex_auth.v0.dex_oidc_config import DexOidcConfigRequirer, DexOidcConfigRelationError
+
+class RequirerCharm(CharmBase):
+    def __init__(self, *args):
+        self._dex_oidc_config_requirer = DexOidcConfigRequirer(self)
+        self.framework.observe(self.on.some_event_emitted, self.some_event_function)
+        self.framework.observe(self._dex_oidc_config_requirer.on.update, self.some_event_function)
+
+    def some_event_function():
+        # use the getter function wherever the info is needed
+        try:
+            k8s_svc_info_data = self._dex_oidc_config_requirer.get_data()
+        except DexOidcConfigRelationError as error:
+            "your error handler goes here"
+```
+
+## Using the library as provider
+
+### Add relation to metadata.yaml
+```yaml
+provides:
+  dex-oidc-config:
+    interface: dex-oidc-config
+```
+
+### Instantiate the DexOidcConfigProvider class in charm.py
+
+```python
+from ops.charm import CharmBase
+from charms.dex_auth.v0.dex_oidc_config import DexOidcConfigProvider, DexOidcConfigRelationError
+
+class ProviderCharm(CharmBase):
+    def __init__(self, *args, **kwargs):
+        ...
+        self._dex_oidc_config_provider = DexOidcConfigProvider(self)
+        self.observe(self.on.some_event, self._some_event_handler)
+    def _some_event_handler(self, ...):
+        # This will update the relation data bag with the issuer URL 
+        try:
+            self._dex_oidc_config_provider.send_data(issuer_url)
+        except DexOidcConfigRelationError as error:
+            "your error handler goes here"
+```
+
+Alternatively, if the provider is just broadcasting known data, it can be:
+
+```python
+from ops.charm import CharmBase
+from charms.dex_auth.v0.dex_oidc_config import DexOidcConfigProvider, DexOidcConfigRelationError
+
+class ProviderCharm(CharmBase):
+    def __init__(self, *args, **kwargs):
+        ...
+        self._dex_oidc_config_provider = DexOidcConfigProvider(self)
+```
+
+## Relation data
+
+The data shared by this library is:
+* issuer-url: the canonical URL for the issuer, OIDC cliets use this to refer to Dex
 """
 import logging
 from typing import List, Optional, Union
