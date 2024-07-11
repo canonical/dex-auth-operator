@@ -150,7 +150,7 @@ class DexOidcConfigUpdatedEvent(RelationEvent):
 class DexOidcConfigEvents(ObjectEvents):
     """Events for the Dex OIDC config library."""
 
-    updated = EventSource(DexOidcConfigUpdatedEventDex OIDC config)
+    updated = EventSource(DexOidcConfigUpdatedEvent)
 
 
 class DexOidcConfigObject(BaseModel):
