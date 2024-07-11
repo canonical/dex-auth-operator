@@ -43,7 +43,7 @@ class DexOidcConfigRelationMissingError(DexOidcConfigRelationError):
     """Exception to raise when the relation is missing on either end."""
 
     def __init__(self):
-        self.message = "Missing relation with a k8s service info provider."
+        self.message = "Missing relation with a Dex OIDC config provider."
         super().__init__(self.message)
 
 
@@ -62,7 +62,7 @@ class DexOidcConfigUpdatedEvent(RelationEvent):
 class DexOidcConfigEvents(ObjectEvents):
     """Events for the Dex OIDC config library."""
 
-    updated = EventSource(DexOidcConfigUpdatedEvent)
+    updated = EventSource(DexOidcConfigUpdatedEventDex OIDC config)
 
 
 class DexOidcConfigObject(BaseModel):
