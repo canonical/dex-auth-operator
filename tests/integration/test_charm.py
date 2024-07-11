@@ -164,7 +164,6 @@ async def test_relations(ops_test: OpsTest):
         namespace=ops_test.model_name,
     )
     log.info(f"got public_url of {public_url}")
-    await ops_test.model.applications[DEX_AUTH_APP_NAME].set_config({"public-url": public_url})
     await ops_test.model.applications[OIDC_GATEKEEPER].set_config({"public-url": public_url})
 
     await ops_test.model.wait_for_idle(
