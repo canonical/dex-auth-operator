@@ -240,14 +240,14 @@ def test_grpc_relation_with_data_when_data_changes(
     """Test the relation data on config changed events."""
     harness.set_leader(True)
     # Change the configuration option before starting harness so
-    # the correct values are passed to the K8sServiceInfo lib
+    # the correct values are passed to the DexOidcConfig lib
     # FIXME: the correct behaviour should be to change the config
     # at any point in time to trigger config events and check the
     # value gets passed correctly when it changes.
     harness.update_config({"issuer-url": "http://my-dex.io/dex"})
     harness.begin()
 
-    # Initialise a k8s-service requirer charm
+    # Initialise a dex-oidc-config requirer charm
     #    harness.charm.leadership_gate.get_status = MagicMock(return_value=ActiveStatus())
     #    harness.charm.kubernetes_resources.get_status = MagicMock(return_value=ActiveStatus())
 

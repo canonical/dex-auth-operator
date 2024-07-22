@@ -35,7 +35,6 @@ class Operator(CharmBase):
 
         self.logger: logging.Logger = logging.getLogger(__name__)
         self._namespace = self.model.name
-        self._app_name = self.model.app.name
 
         # Patch the service to correctly expose the ports to be used
         dex_port = ServicePort(int(self.model.config["port"]), name="dex")
@@ -105,7 +104,9 @@ class Operator(CharmBase):
         """Return issuer-url value if config option exists; otherwise default Dex's endpoint."""
         if issuer_url := self.model.config["issuer-url"]:
             return issuer_url
-        return f"http://{self._app_name}.{self._namespace}.svc:5556/dex"
+        return (
+            f"http://{self.model.app.name}.{self._namespace}.svc:{self.model.config['port']}/dex"
+        )
 
     def _update_layer(self) -> None:
         """Updates the Pebble configuration layer if changed."""
