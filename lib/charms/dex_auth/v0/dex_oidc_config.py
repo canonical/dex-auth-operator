@@ -239,7 +239,9 @@ class DexOidcConfigRequirerWrapper(Object):
         """Series of checks for the relation and relation data.
 
         Args:
-            relation (Relation): the relation object to run the checks on
+            relation (Relation): the relation object to run the checks on.
+              This object must always come from a call of get_relation, which
+              can either return the Relation object or None.
 
         Raises:
             DexOidcConfigRelationDataMissingError if data is missing or incomplete
