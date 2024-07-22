@@ -235,13 +235,13 @@ class DexOidcConfigRequirerWrapper(Object):
         self.relation_name = relation_name
 
     @staticmethod
-    def _validate_relation(relation: Relation) -> None:
+    def _validate_relation(relation: Optional[Relation]) -> None:
         """Series of checks for the relation and relation data.
 
         Args:
-            relation (Relation): the relation object to run the checks on.
+            relation (optional, Relation): the relation object to run the checks on.
               This object must always come from a call of get_relation, which
-              can either return the Relation object or None.
+              can either return a Relation object or None.
 
         Raises:
             DexOidcConfigRelationDataMissingError if data is missing or incomplete
