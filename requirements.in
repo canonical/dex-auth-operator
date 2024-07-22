@@ -5,6 +5,8 @@ charmed-kubeflow-chisme
 jinja2
 lightkube
 ops
+# This is required by the dex-oidc-config library
+pydantic
 serialized-data-interface
 # from prometheus_k8s.v0.prometheus_scrape.py
 cosl
