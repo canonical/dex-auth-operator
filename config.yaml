@@ -6,14 +6,22 @@ options:
     type: boolean
     default: true
     description: Allows dex to keep a list of passwords which can be used to login to dex
+  issuer-url:
+    type: string
+    default: ''
+    description: |
+      Format http(s)://<publicly-accessible-dns-name>/dex
+      (Also referred to as issuer or OIDC provider ) This is the canonical URL that OIDC clients
+      MUST use to refer to dex. If not specified, it defaults to dex-auth's local
+      endpoint constructed from dex-auth's Kubernetes Service DNS name, the
+      Service port and Dex's endpoint, that is http://<dex-auth-app-name>.<namespace>.svc:5556/dex.
+      The default is set by the charm code, not the configuration option.
+      This configuration must be set when using a Dex connector that will try to reach Dex from outside
+      the cluster, thus it should be a publicly accessible endpoint, for example https://my-instance.in-my-cloud.some-cloud.com/dex
   port:
     type: int
     default: 5556
     description: Listening port
-  public-url:
-    type: string
-    default: ''
-    description: Publicly-accessible endpoint for cluster
   connectors:
     type: string
     default: ''

@@ -10,6 +10,7 @@ from uuid import uuid4
 import bcrypt
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
+from charms.dex_auth.v0.dex_oidc_config import DexOidcConfigProvider
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
@@ -33,10 +34,14 @@ class Operator(CharmBase):
         super().__init__(*args)
 
         self.logger: logging.Logger = logging.getLogger(__name__)
+        self._namespace = self.model.name
 
         # Patch the service to correctly expose the ports to be used
         dex_port = ServicePort(int(self.model.config["port"]), name="dex")
         metrics_port = ServicePort(int(METRICS_PORT), name="metrics-port")
+
+        # Instantiate a DexOidcConfigProvider to share this app's issuer_url
+        self.dex_oidc_config_provider = DexOidcConfigProvider(self, issuer_url=self._issuer_url)
 
         self.service_patcher = KubernetesServicePatch(
             self,
@@ -58,7 +63,6 @@ class Operator(CharmBase):
         self._logging = LogForwarder(charm=self)
 
         self._container_name = "dex"
-        self._namespace = self.model.name
         self._container = self.unit.get_container(self._container_name)
         self._entrypoint = "/usr/local/bin/docker-entrypoint"
         self._dex_config_path = "/etc/dex/config.docker.yaml"
@@ -94,6 +98,15 @@ class Operator(CharmBase):
             },
         }
         return Layer(layer_config)
+
+    @property
+    def _issuer_url(self) -> str:
+        """Return issuer-url value if config option exists; otherwise default Dex's endpoint."""
+        if issuer_url := self.model.config["issuer-url"]:
+            return issuer_url
+        return (
+            f"http://{self.model.app.name}.{self._namespace}.svc:{self.model.config['port']}/dex"
+        )
 
     def _update_layer(self) -> None:
         """Updates the Pebble configuration layer if changed."""
@@ -192,9 +205,6 @@ class Operator(CharmBase):
         # Load config values as convenient variables
         connectors = yaml.safe_load(self.model.config["connectors"])
         port = self.model.config["port"]
-        public_url = self.model.config["public-url"].lower()
-        if not public_url.startswith(("http://", "https://")):
-            public_url = f"http://{public_url}"
 
         enable_password_db = self.model.config["enable-password-db"]
         static_config = {
@@ -227,7 +237,7 @@ class Operator(CharmBase):
 
         config = yaml.dump(
             {
-                "issuer": f"{public_url}/dex",
+                "issuer": self._issuer_url,
                 "storage": {"type": "kubernetes", "config": {"inCluster": True}},
                 "web": {"http": f"0.0.0.0:{port}"},
                 "telemetry": {"http": "0.0.0.0:5558"},
