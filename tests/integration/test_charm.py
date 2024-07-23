@@ -161,7 +161,7 @@ async def test_relations(ops_test: OpsTest):
     # canonical/oidc-gatekeeper-operator/pull/163 get merged
     # After that, we should integrate dex-auth and oidc-gatekeeper.
     # See canonical/oidc-gatekeeper-operator#157 for more details
-    public_url = f"http://{DEX_AUTH_APP_NAME}.{ops_test.model_name}.svc:5556/dex"
+    public_url = f"http://{DEX_AUTH_APP_NAME}.{ops_test.model_name}.svc:5556"
     await ops_test.model.applications[OIDC_GATEKEEPER].set_config({"public-url": public_url})
 
     await ops_test.model.wait_for_idle(
