@@ -229,8 +229,8 @@ def test_dex_oidc_config_with_data(harness):
     rel_data = harness.model.get_relation(DEX_OIDC_CONFIG_RELATION, rel_id).data[harness.model.app]
 
     # Default values are expected
-    expected = {"issuer-url": f"http://{harness.model.app.name}.{harness.model.name}.svc:5556/dex"}
-    assert rel_data["issuer-url"] == expected["issuer-url"]
+    expected_url = f"http://{harness.model.app.name}.{harness.model.name}.svc:5556/dex"
+    assert rel_data["issuer-url"] == expected_url
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
