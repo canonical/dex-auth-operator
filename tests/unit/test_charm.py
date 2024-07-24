@@ -159,6 +159,7 @@ def test_config_changed(update, harness):
         "connectors": "connector01",
         "static-username": "new-user",
         "static-password": "new-pass",
+        "public-url": "",
     }
 
     harness.update_config(config_updates)
@@ -261,3 +262,46 @@ def test_grpc_relation_with_data_when_data_changes(
 
     # Change the port of the service and check the value changes
     assert provider_rel_data["issuer-url"] == harness.model.config["issuer-url"]
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+@pytest.mark.parametrize(
+    "issuer_url_config, default_value, expected_result",
+    (
+        (None, True, None),
+        ("http://my-dex.io:5557/dex", False, "http://my-dex.io:5557/dex"),
+    ),
+)
+def test_issuer_url_property_with_issuer_url_config(
+    issuer_url_config, default_value, expected_result, harness
+):
+    """Test the property returns as expected.
+
+
+    The first case assumes the issuer-url config option is not set, thus the default-value
+    of "http://dex-auth.<namespace>.svc:5556/dex" should be returned; the second case should return
+    the value set in the config option.
+    """
+    harness.set_leader(True)
+    harness.update_config({"issuer-url": issuer_url_config})
+    harness.begin()
+
+    if default_value:
+        expected_result = f"http://{harness.model.app.name}.{harness.model.name}.svc:5556/dex"
+    assert harness.charm._issuer_url == expected_result
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+@pytest.mark.parametrize(
+    "public_url_config, expected_result",
+    (
+        ("http://my-dex.io:5557", "http://my-dex.io:5557/dex"),
+        ("my-dex.io:5557", "http://my-dex.io:5557/dex"),
+    ),
+)
+def test_issuer_url_property_with_public_url_config(public_url_config, expected_result, harness):
+    """Test the property returns as expected."""
+    harness.set_leader(True)
+    harness.update_config({"public-url": public_url_config})
+    harness.begin()
+    assert harness.charm._issuer_url == expected_result

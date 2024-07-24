@@ -36,3 +36,10 @@ options:
     type: string
     default: ''
     description: Static password for logging in without an external auth service
+  public-url:
+    type: string
+    default: ''
+    description: |
+      DEPRECATED - Please leave empty or use issuer-url instead. This configuration option will be removed soon.
+      It has been preserved to avoid breaking compatibility with existing deployments.
+      Publicly-accessible endpoint for cluster
