@@ -104,6 +104,19 @@ class Operator(CharmBase):
         """Return issuer-url value if config option exists; otherwise default Dex's endpoint."""
         if issuer_url := self.model.config["issuer-url"]:
             return issuer_url
+        # TODO: remove this after the release of dex-auth 2.39
+        # This should not be supported anymore, but has been kept for compatibility
+        if public_url := self.model.config["public-url"]:
+            self.logger.warning(
+                "DEPRECATED: The public-url config option is deprecated"
+                "Please leave empty or use issuer-url;"
+                "otherwise this may cause unexpected behaviour."
+            )
+            # This will just cover cases like when the URL is my-dex.io:5557,
+            # not when it starts with a different protocol
+            if not public_url.startswith(("http://", "https://")):
+                public_url = f"http://{public_url}"
+            return f"{public_url}/dex"
         return (
             f"http://{self.model.app.name}.{self._namespace}.svc:{self.model.config['port']}/dex"
         )
