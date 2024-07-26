@@ -41,7 +41,9 @@ class Operator(CharmBase):
         metrics_port = ServicePort(int(METRICS_PORT), name="metrics-port")
 
         # Instantiate a DexOidcConfigProvider to share this app's issuer_url
-        self.dex_oidc_config_provider = DexOidcConfigProvider(self, issuer_url=self._issuer_url)
+        self.dex_oidc_config_provider = DexOidcConfigProvider(
+            self, issuer_url=self._issuer_url, refresh_events=[self.on.config_changed]
+        )
 
         self.service_patcher = KubernetesServicePatch(
             self,
