@@ -135,8 +135,12 @@ async def test_relations(ops_test: OpsTest):
         channel=OIDC_GATEKEEPER_CHANNEL,
         config=OIDC_GATEKEEPER_CONFIG,
     )
-    await ops_test.model.add_relation(f"{OIDC_GATEKEEPER}:dex-oidc-config", f"{DEX_AUTH_APP_NAME}:dex-oidc-config")
-    await ops_test.model.add_relation(f"{OIDC_GATEKEEPER}:oidc-client", f"{DEX_AUTH_APP_NAME}:oidc-client")
+    await ops_test.model.add_relation(
+        f"{OIDC_GATEKEEPER}:dex-oidc-config", f"{DEX_AUTH_APP_NAME}:dex-oidc-config"
+    )
+    await ops_test.model.add_relation(
+        f"{OIDC_GATEKEEPER}:oidc-client", f"{DEX_AUTH_APP_NAME}:oidc-client"
+    )
     await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{DEX_AUTH_APP_NAME}:ingress")
     await ops_test.model.add_relation(
         f"{ISTIO_PILOT}:ingress-auth",
