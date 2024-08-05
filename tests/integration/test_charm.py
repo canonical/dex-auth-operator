@@ -160,15 +160,6 @@ async def test_relations(ops_test: OpsTest):
     await ops_test.model.add_relation(KUBEFLOW_PROFILES, KUBEFLOW_DASHBOARD)
     await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{KUBEFLOW_DASHBOARD}:ingress")
 
-    # Set public-url for oidc
-    # Leaving the default value of Dex's Kubernetes Service temporarily
-    # FIXME: remove this configuration option after canonical/oidc-gatekeeper-operator/pull/164 and
-    # canonical/oidc-gatekeeper-operator/pull/163 get merged
-    # After that, we should integrate dex-auth and oidc-gatekeeper.
-    # See canonical/oidc-gatekeeper-operator#157 for more details
-    public_url = f"http://{DEX_AUTH_APP_NAME}.{ops_test.model_name}.svc:5556"
-    await ops_test.model.applications[OIDC_GATEKEEPER].set_config({"public-url": public_url})
-
     await ops_test.model.wait_for_idle(
         apps=[
             DEX_AUTH_APP_NAME,
