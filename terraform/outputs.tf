@@ -4,7 +4,7 @@ output "app_name" {
 
 output "provides" {
   value = {
-    dex_oidc_config = "dex-oidc-config",
+    dex_oidc_config   = "dex-oidc-config",
     grafana_dashboard = "grafana-dashboard",
     metrics_endpoint  = "metrics-endpoint",
   }
@@ -12,7 +12,7 @@ output "provides" {
 
 output "requires" {
   value = {
-    ingress = "ingress",
+    ingress     = "ingress",
     oidc_client = "oidc-client",
   }
 }
