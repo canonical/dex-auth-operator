@@ -13,6 +13,7 @@ output "provides" {
 output "requires" {
   value = {
     ingress     = "ingress",
+    logging     = "logging",
     oidc_client = "oidc-client",
   }
 }
