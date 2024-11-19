@@ -43,3 +43,13 @@ options:
       DEPRECATED - Please leave empty or use issuer-url instead. This configuration option will be removed soon.
       It has been preserved to avoid breaking compatibility with existing deployments.
       Publicly-accessible endpoint for cluster
+  enable-expiry:
+    type: boolean
+    default: false
+    description: Modify expiry settings for dex
+  expiry-settings:
+    type: string
+    default: ''
+    description: |
+      Expiry settings in YAML format, as shown
+      in https://dexidp.io/docs/configuration/tokens/#expiration-and-rotation-settings

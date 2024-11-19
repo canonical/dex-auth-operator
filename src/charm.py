@@ -226,6 +226,8 @@ class Operator(CharmBase):
             "staticPasswords": [],
         }
 
+        enable_expiry = self.model.config["enable-expiry"]
+
         # The dex-auth service cannot be started correctly when the static
         # login is disabled, but no connector configuration is provided.
         if not enable_password_db and not connectors:
@@ -249,6 +251,12 @@ class Operator(CharmBase):
                     }
                 ],
             }
+
+        # Add expiry settings for dex-auth
+        # This operation might modify the security level
+        if enable_expiry:
+            expiry_config = yaml.safe_load(self.model.config["expiry-settings"])
+            static_config["expiry"] = expiry_config
 
         config = yaml.dump(
             {
