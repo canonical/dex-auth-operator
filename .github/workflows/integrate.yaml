@@ -55,9 +55,7 @@ jobs:
           channel: 1.29-strict/stable
           juju-channel: 3.6/stable
           microk8s-addons: "dns storage rbac metallb:10.64.140.43-10.64.140.49"
-
-      # https://github.com/charmed-kubernetes/actions-operator/issues/27
-      - run: sudo snap refresh charmcraft --channel latest/candidate
+          charmcraft-channel: 3.x/stable
 
       - name: Run test
         run: |
