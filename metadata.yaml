@@ -1,6 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 name: dex-auth
+display-name: Dex
 summary: A federated OpenID Connect provider
 description: |
   Dex is an identity service that uses OpenID Connect to drive authentication for other apps.
@@ -11,68 +12,11 @@ docs: https://discourse.charmhub.io/t/charmed-dex/8214
 requires:
   oidc-client:
     interface: oidc-client
-    schema:
-      v1:
-        provides:
-          type: object
-          properties:
-            id:
-              type: string
-            name:
-              type: string
-            redirectURIs:
-              type: array
-              items:
-                type: string
-            secret:
-              type: string
-          required:
-          - id
-          - name
-          - redirectURIs
-          - secret
-    versions: [v1]
-    __schema_source: https://raw.githubusercontent.com/canonical/operator-schemas/master/oidc-client.yaml
   ingress:
     interface: ingress
-    schema:
-      v2:
-        requires:
-          type: object
-          properties:
-            service:
-              type: string
-            port:
-              type: integer
-            namespace:
-              type: string
-            prefix:
-              type: string
-            rewrite:
-              type: string
-          required:
-          - service
-          - port
-          - namespace
-          - prefix
-      v1:
-        requires:
-          type: object
-          properties:
-            service:
-              type: string
-            port:
-              type: integer
-            prefix:
-              type: string
-            rewrite:
-              type: string
-          required:
-          - service
-          - port
-          - prefix
-    versions: [v1]
-    __schema_source: https://raw.githubusercontent.com/canonical/operator-schemas/master/ingress.yaml
+  ingress-v2:
+    interface: ingress
+    limit: 1
   logging:
     interface: loki_push_api
     optional: true

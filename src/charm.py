@@ -15,6 +15,7 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.framework import StoredState
@@ -26,6 +27,8 @@ from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, ge
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
 
+INGRESS_V2_INTEGRATION_NAME = "ingress-v2"
+
 
 class Operator(CharmBase):
     state = StoredState()
@@ -36,6 +39,9 @@ class Operator(CharmBase):
         self.logger: logging.Logger = logging.getLogger(__name__)
         self._namespace = self.model.name
 
+        self._ingress = IngressPerAppRequirer(
+            self, relation_name=INGRESS_V2_INTEGRATION_NAME, port=int(self.model.config["port"])
+        )
         # Patch the service to correctly expose the ports to be used
         dex_port = ServicePort(int(self.model.config["port"]), name="dex")
         metrics_port = ServicePort(int(METRICS_PORT), name="metrics-port")
@@ -77,6 +83,8 @@ class Operator(CharmBase):
             self.on.oidc_client_relation_changed,
             self.on.ingress_relation_changed,
             self.on.dex_pebble_ready,
+            self._ingress.on.data_provided,
+            self._ingress.on.data_removed,
         ]:
             self.framework.observe(event, self.main)
 
@@ -119,6 +127,8 @@ class Operator(CharmBase):
             if not public_url.startswith(("http://", "https://")):
                 public_url = f"http://{public_url}"
             return f"{public_url}/dex"
+        if ingress_url := self._ingress.url:
+            return ingress_url
         return (
             f"http://{self.model.app.name}.{self._namespace}.svc:{self.model.config['port']}/dex"
         )
