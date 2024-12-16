@@ -10,3 +10,4 @@ pydantic
 serialized-data-interface
 # from prometheus_k8s.v0.prometheus_scrape.py
 cosl
+pydantic ==2.10.3
