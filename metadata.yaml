@@ -89,6 +89,7 @@ provides:
     interface: dex-oidc-config
   oauth:
     interface: oauth
+    limit: 1
 containers:
   dex:
     resource: oci-image
