@@ -7,6 +7,7 @@ import typing
 from random import choices
 from string import ascii_letters
 from uuid import uuid4
+import secrets
 
 import bcrypt
 import yaml
@@ -27,11 +28,15 @@ from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    WaitingStatus,
+    SecretNotFoundError,
+)
 from ops.pebble import Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interface
-
-from oauth import OAuthRelationService
 
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
@@ -39,6 +44,9 @@ METRICS_PORT = "5558"
 INGRESS_V2_INTEGRATION_NAME = "ingress-v2"
 OAUTH_INTEGRATION_NAME = "oauth"
 DEFAULT_OAUTH_SCOPES = ["openid", "email", "profile"]
+
+OAUTH_STATIC_CLIENT_SECRET_LABEL = "oauth.static.client"
+
 
 class Operator(CharmBase):
     state = StoredState()
@@ -62,7 +70,6 @@ class Operator(CharmBase):
         )
 
         self._oauth_provider = OAuthProvider(self, relation_name=OAUTH_INTEGRATION_NAME)
-        self._oauth_service = OAuthRelationService(self)
 
         self.service_patcher = KubernetesServicePatch(
             self,
@@ -225,7 +232,19 @@ class Operator(CharmBase):
 
         return interface
 
-    def main(self, event, dex_oauth_static_client: typing.Optional[dict] = None):
+    def main(self, event):
+        try:
+            secret = self.model.get_secret(label=OAUTH_STATIC_CLIENT_SECRET_LABEL)
+            oauth_client_secret = secret.get_content()
+            dex_oauth_static_client = {
+                "id": oauth_client_secret["client-id"],
+                "secret": oauth_client_secret["client-secret"],
+                "redirectURIs": [oauth_client_secret["redirect-uri"]],
+                "name": oauth_client_secret["name"],
+            }
+        except SecretNotFoundError:
+            dex_oauth_static_client = None
+
         try:
             self._check_leader()
             self.model.unit.status = MaintenanceStatus("Configuring dex charm")
@@ -320,28 +339,24 @@ class Operator(CharmBase):
         Args:
             event (ClientCreatedEvent): _description_
         """
-        try:
-            oauth_client = self._oauth_service.get_oauth_static_client()
-        except Exception as exc:
-            self.logger.exception("")
-            self.unit.status = WaitingStatus(str(exc))
-            event.defer()
-
-        dex_oauth_static_client = {
-            "id": oauth_client.client_id,
-            "redirectURIs": [event.redirect_uri],
-            "name": f"oauth_{event.relation_id}",
-            "secret": oauth_client.client_secret,
-        }
-
-        self.main(event, dex_oauth_static_client)
-
         if self.unit.is_leader():
+            oauth_client_static_secret = {
+                "client-id": secrets.token_hex(16),
+                "client-secret": secrets.token_hex(16),
+                "redirect-uri": event.redirect_uri,
+                "name": f"oauth_{event.relation_id}",
+            }
+
+            self.app.add_secret(
+                content=oauth_client_static_secret, label=OAUTH_STATIC_CLIENT_SECRET_LABEL
+            )
+
             self._oauth_provider.set_client_credentials_in_relation_data(
                 event.relation_id,
-                oauth_client.client_id,
-                oauth_client.client_secret,
+                oauth_client_static_secret["client-id"],
+                oauth_client_static_secret["client-secret"],
             )
+            self.main(event)
 
     def _on_oauth_client_changed(self, event: ClientChangedEvent) -> None:
         """_summary_
@@ -349,21 +364,10 @@ class Operator(CharmBase):
         Args:
             event (ClientChangedEvent): _description_
         """
-        try:
-            oauth_client = self._oauth_service.get_oauth_static_client()
-        except Exception as exc:
-            self.logger.exception("")
-            self.unit.status = WaitingStatus(str(exc))
-            event.defer()
+        secret = self.model.get_secret(label=OAUTH_STATIC_CLIENT_SECRET_LABEL)
 
-        dex_oauth_static_client = {
-            "id": oauth_client.client_id,
-            "redirectURIs": [event.redirect_uri],
-            "name": f"oauth_{event.relation_id}",
-            "secret": oauth_client.client_secret,
-        }
-
-        self.main(event, dex_oauth_static_client)
+        secret.set_content({"redirectURIs": [event.redirect_uri]})
+        self.main(event)
 
     def _on_oauth_client_deleted(self, event: ClientDeletedEvent) -> None:
         """_summary_
@@ -372,7 +376,7 @@ class Operator(CharmBase):
             event (ClientDeletedEvent): _description_
         """
         self._oauth_service.remove_oauth_static_client()
-        self.main(event, None)
+        self.main(event)
 
 
 if __name__ == "__main__":
