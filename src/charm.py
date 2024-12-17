@@ -3,11 +3,11 @@
 # See LICENSE file for licensing details.
 
 import logging
+import secrets
 import typing
 from random import choices
 from string import ascii_letters
 from uuid import uuid4
-import secrets
 
 import bcrypt
 import yaml
@@ -32,8 +32,8 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
-    WaitingStatus,
     SecretNotFoundError,
+    WaitingStatus,
 )
 from ops.pebble import Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interface
@@ -233,6 +233,11 @@ class Operator(CharmBase):
         return interface
 
     def main(self, event):
+        """Main reconcile loop.
+
+        Args:
+            event: Charm event
+        """
         try:
             secret = self.model.get_secret(label=OAUTH_STATIC_CLIENT_SECRET_LABEL)
             oauth_client_secret = secret.get_content()
@@ -271,6 +276,7 @@ class Operator(CharmBase):
 
     def _generate_dex_auth_config(self, dex_oauth_static_client: typing.Optional[dict]) -> str:
         """Returns dex-auth configuration to be passed when (re)starting the dex-auth service.
+
         Raises:
             CheckFailedError: when static login is disabled and no connectors are configured.
         """
@@ -334,10 +340,10 @@ class Operator(CharmBase):
         return config
 
     def _on_oauth_client_created(self, event: ClientCreatedEvent) -> None:
-        """_summary_
+        """Handle oauth-client-created event.
 
         Args:
-            event (ClientCreatedEvent): _description_
+            event: ClientCreatedEvent
         """
         if self.unit.is_leader():
             oauth_client_static_secret = {
@@ -359,10 +365,10 @@ class Operator(CharmBase):
             self.main(event)
 
     def _on_oauth_client_changed(self, event: ClientChangedEvent) -> None:
-        """_summary_
+        """Handle oauth-client-changed event.
 
         Args:
-            event (ClientChangedEvent): _description_
+            event: ClientChangedEvent
         """
         secret = self.model.get_secret(label=OAUTH_STATIC_CLIENT_SECRET_LABEL)
 
@@ -370,10 +376,10 @@ class Operator(CharmBase):
         self.main(event)
 
     def _on_oauth_client_deleted(self, event: ClientDeletedEvent) -> None:
-        """_summary_
+        """Handle oauth-client-deleted event.
 
         Args:
-            event (ClientDeletedEvent): _description_
+            event: ClientDeletedEvent
         """
         self._oauth_service.remove_oauth_static_client()
         self.main(event)
