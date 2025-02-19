@@ -90,4 +90,6 @@ resources:
   oci-image:
     type: oci-image
     description: OCI image for dex container
-    upstream-source: ghcr.io/dexidp/dex:v2.41.1
+    # Integrating the rock requires running the Pebble service as a non-root user
+    # See: https://github.com/canonical/kfp-operators/issues/675
+    upstream-source: charmedkubeflow/dex:2.41.1-1d3fe19
