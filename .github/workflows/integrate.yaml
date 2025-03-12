@@ -17,21 +17,31 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
     - name: Check out code
       uses: actions/checkout@v4
+      
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v5.4.0
+      with:
+        python-version: 3.8
 
     - run: pip install tox
     - run: tox -vve lint
 
   unit-test:
     name: Unit
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5.4.0
+        with:
+          python-version: 3.8
+        
       - run: pip install tox
       - run: tox -e unit
 
@@ -43,11 +53,16 @@ jobs:
 
   integration-test:
     name: Integration
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5.4.0
+        with:
+          python-version: 3.8
+        
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
@@ -65,7 +80,7 @@ jobs:
           wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo apt install ./google-chrome-stable_current_amd64.deb
           sudo apt-get install chromium-chromedriver
-          sg snap_microk8s -c "tox -e integration -- --model kubeflow"
+          tox -e integration -- --model kubeflow
 
       - name: Get istio gateway
         run: kubectl get gateway -A
