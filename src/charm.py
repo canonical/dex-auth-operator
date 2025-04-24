@@ -382,7 +382,12 @@ class Operator(CharmBase):
         Args:
             event: ClientDeletedEvent
         """
-        self._oauth_service.remove_oauth_static_client()
+        if self.unit.is_leader():
+            try:
+                secret = self.model.get_secret(label=OAUTH_STATIC_CLIENT_SECRET_LABEL)
+                secret.remove_all_revisions()
+            except SecretNotFoundError:
+                self.logger.warning("Secret not found, skipping deletion.")
         self.main(event)
 
 
