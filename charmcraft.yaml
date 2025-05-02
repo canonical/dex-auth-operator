@@ -5,13 +5,20 @@ type: charm
 bases:
   - build-on:
     - name: "ubuntu"
-      channel: "20.04"
+      channel: "22.04"
     run-on:
     - name: "ubuntu"
-      channel: "20.04"
+      channel: "22.04"
+charm-libs:
+  - lib: traefik_k8s.ingress
+    version: "2"
+  - lib: hydra.oauth
+    version: "0"
 parts:
   charm:
     charm-python-packages: [setuptools, pip]
     # Install rustc and cargo as build packages because some charm's
     # dependencies need this to be built and installed from source.
     build-packages: [cargo, rustc, pkg-config, libffi-dev, libssl-dev]
+assumes:
+  - juju >= 3.3

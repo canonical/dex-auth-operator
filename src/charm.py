@@ -3,6 +3,8 @@
 # See LICENSE file for licensing details.
 
 import logging
+import secrets
+import typing
 from random import choices
 from string import ascii_letters
 from uuid import uuid4
@@ -12,19 +14,38 @@ import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charms.dex_auth.v0.dex_oidc_config import DexOidcConfigProvider
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.hydra.v0.oauth import (
+    ClientChangedEvent,
+    ClientCreatedEvent,
+    ClientDeletedEvent,
+    OAuthProvider,
+)
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from lightkube.models.core_v1 import ServicePort
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    SecretNotFoundError,
+    WaitingStatus,
+)
 from ops.pebble import Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interface
 
 METRICS_PATH = "/metrics"
 METRICS_PORT = "5558"
+
+INGRESS_V2_INTEGRATION_NAME = "ingress-v2"
+OAUTH_INTEGRATION_NAME = "oauth"
+DEFAULT_OAUTH_SCOPES = ["openid", "email", "profile"]
+
+OAUTH_STATIC_CLIENT_SECRET_LABEL = "oauth.static.client"
 
 
 class Operator(CharmBase):
@@ -36,6 +57,9 @@ class Operator(CharmBase):
         self.logger: logging.Logger = logging.getLogger(__name__)
         self._namespace = self.model.name
 
+        self._ingress = IngressPerAppRequirer(
+            self, relation_name=INGRESS_V2_INTEGRATION_NAME, port=int(self.model.config["port"])
+        )
         # Patch the service to correctly expose the ports to be used
         dex_port = ServicePort(int(self.model.config["port"]), name="dex")
         metrics_port = ServicePort(int(METRICS_PORT), name="metrics-port")
@@ -44,6 +68,8 @@ class Operator(CharmBase):
         self.dex_oidc_config_provider = DexOidcConfigProvider(
             self, issuer_url=self._issuer_url, refresh_events=[self.on.config_changed]
         )
+
+        self._oauth_provider = OAuthProvider(self, relation_name=OAUTH_INTEGRATION_NAME)
 
         self.service_patcher = KubernetesServicePatch(
             self,
@@ -77,8 +103,21 @@ class Operator(CharmBase):
             self.on.oidc_client_relation_changed,
             self.on.ingress_relation_changed,
             self.on.dex_pebble_ready,
+            self._ingress.on.ready,
+            self._ingress.on.revoked,
+            self.on.oauth_relation_created,
         ]:
             self.framework.observe(event, self.main)
+
+        self.framework.observe(
+            self._oauth_provider.on.client_created, self._on_oauth_client_created
+        )
+        self.framework.observe(
+            self._oauth_provider.on.client_changed, self._on_oauth_client_changed
+        )
+        self.framework.observe(
+            self._oauth_provider.on.client_deleted, self._on_oauth_client_deleted
+        )
 
     @property
     def _dex_auth_layer(self) -> Layer:
@@ -120,17 +159,19 @@ class Operator(CharmBase):
             if not public_url.startswith(("http://", "https://")):
                 public_url = f"http://{public_url}"
             return f"{public_url}/dex"
+        if ingress_url := self._ingress.url:
+            return ingress_url
         return (
             f"http://{self.model.app.name}.{self._namespace}.svc:{self.model.config['port']}/dex"
         )
 
-    def _update_layer(self) -> None:
+    def _update_layer(self, dex_oauth_static_client: typing.Optional[dict]) -> None:
         """Updates the Pebble configuration layer if changed."""
         self._check_container_connection()
 
         # Generate dex-auth configuration to be passed to the pebble layer
         # so the service is (re)started.
-        dex_auth_config = self._generate_dex_auth_config()
+        dex_auth_config = self._generate_dex_auth_config(dex_oauth_static_client)
 
         # Get current layer
         current_layer = self._container.get_plan()
@@ -193,30 +234,61 @@ class Operator(CharmBase):
         return interface
 
     def main(self, event):
+        """Main reconcile loop.
+
+        Args:
+            event: Charm event
+        """
+        try:
+            secret = self.model.get_secret(label=OAUTH_STATIC_CLIENT_SECRET_LABEL)
+            oauth_client_secret = secret.get_content()
+            dex_oauth_static_client = {
+                "id": oauth_client_secret["client-id"],
+                "secret": oauth_client_secret["client-secret"],
+                "redirectURIs": [oauth_client_secret["redirect-uri"]],
+                "name": oauth_client_secret["name"],
+            }
+        except SecretNotFoundError:
+            dex_oauth_static_client = None
+
         try:
             self._check_leader()
             self.model.unit.status = MaintenanceStatus("Configuring dex charm")
             self.ensure_state()
-            self._update_layer()
+            self._update_layer(dex_oauth_static_client)
             self.handle_ingress()
         except ErrorWithStatus as err:
             self.model.unit.status = err.status
             self.logger.error(f"Failed to handle {event} with error: {err}")
             return
 
+        if self.unit.is_leader():
+            self._oauth_provider.set_provider_info_in_relation_data(
+                issuer_url=self._issuer_url,
+                authorization_endpoint=f"{self._issuer_url}/auth",
+                token_endpoint=f"{self._issuer_url}/token",
+                jwks_endpoint=f"{self._issuer_url}/keys",
+                introspection_endpoint=f"{self._issuer_url}/token/introspect",
+                userinfo_endpoint=f"{self._issuer_url}/userinfo",
+                scope=" ".join(DEFAULT_OAUTH_SCOPES),
+            )
+
         self.model.unit.status = ActiveStatus()
 
-    def _generate_dex_auth_config(self) -> str:
+    def _generate_dex_auth_config(self, dex_oauth_static_client: typing.Optional[dict]) -> str:
         """Returns dex-auth configuration to be passed when (re)starting the dex-auth service.
+
         Raises:
             CheckFailedError: when static login is disabled and no connectors are configured.
         """
         # Get OIDC client info
+        oidc_client_info = []
         oidc = self._get_interface("oidc-client")
         if oidc:
-            oidc_client_info = list(oidc.get_data().values())
-        else:
-            oidc_client_info = []
+            oidc_client_info.extend(list(oidc.get_data().values()))
+
+        if dex_oauth_static_client:
+            oidc_client_info.append(dex_oauth_static_client)
 
         # Load config values as convenient variables
         connectors = yaml.safe_load(self.model.config["connectors"])
@@ -267,6 +339,56 @@ class Operator(CharmBase):
         )
 
         return config
+
+    def _on_oauth_client_created(self, event: ClientCreatedEvent) -> None:
+        """Handle oauth-client-created event.
+
+        Args:
+            event: ClientCreatedEvent
+        """
+        if self.unit.is_leader():
+            oauth_client_static_secret = {
+                "client-id": secrets.token_hex(16),
+                "client-secret": secrets.token_hex(16),
+                "redirect-uri": event.redirect_uri,
+                "name": f"oauth_{event.relation_id}",
+            }
+
+            self.app.add_secret(
+                content=oauth_client_static_secret, label=OAUTH_STATIC_CLIENT_SECRET_LABEL
+            )
+
+            self._oauth_provider.set_client_credentials_in_relation_data(
+                event.relation_id,
+                oauth_client_static_secret["client-id"],
+                oauth_client_static_secret["client-secret"],
+            )
+            self.main(event)
+
+    def _on_oauth_client_changed(self, event: ClientChangedEvent) -> None:
+        """Handle oauth-client-changed event.
+
+        Args:
+            event: ClientChangedEvent
+        """
+        secret = self.model.get_secret(label=OAUTH_STATIC_CLIENT_SECRET_LABEL)
+
+        secret.set_content({"redirectURIs": [event.redirect_uri]})
+        self.main(event)
+
+    def _on_oauth_client_deleted(self, event: ClientDeletedEvent) -> None:
+        """Handle oauth-client-deleted event.
+
+        Args:
+            event: ClientDeletedEvent
+        """
+        if self.unit.is_leader():
+            try:
+                secret = self.model.get_secret(label=OAUTH_STATIC_CLIENT_SECRET_LABEL)
+                secret.remove_all_revisions()
+            except SecretNotFoundError:
+                self.logger.warning("Secret not found, skipping deletion.")
+        self.main(event)
 
 
 if __name__ == "__main__":
