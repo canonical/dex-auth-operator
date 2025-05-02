@@ -37,13 +37,13 @@ DEX_AUTH_CONFIG = {
 }
 
 OIDC_GATEKEEPER = "oidc-gatekeeper"
-OIDC_GATEKEEPER_CHANNEL = "latest/edge"
+OIDC_GATEKEEPER_CHANNEL = "ckf-1.10/stable"
 OIDC_GATEKEEPER_CONFIG = {
     "client-name": "Ambassador Auth OIDC",
     "client-secret": "oidc-client-secret",
 }
 
-ISTIO_OPERATORS_CHANNEL = "latest/edge"
+ISTIO_OPERATORS_CHANNEL = "1.24/stable"
 ISTIO_PILOT = "istio-pilot"
 ISTIO_PILOT_TRUST = True
 ISTIO_PILOT_CONFIG = {"default-gateway": "kubeflow-gateway"}
@@ -53,11 +53,11 @@ ISTIO_GATEWAY_TRUST = True
 ISTIO_GATEWAY_CONFIG = {"kind": "ingress"}
 
 KUBEFLOW_PROFILES = "kubeflow-profiles"
-KUBEFLOW_PROFILES_CHANNEL = "latest/edge"
+KUBEFLOW_PROFILES_CHANNEL = "1.10/stable"
 KUBEFLOW_PROFILES_TRUST = True
 
 KUBEFLOW_DASHBOARD = "kubeflow-dashboard"
-KUBEFLOW_DASHBOARD_CHANNEL = "latest/edge"
+KUBEFLOW_DASHBOARD_CHANNEL = "1.10/stable"
 KUBEFLOW_DASHBOARD_TRUST = True
 
 log = logging.getLogger(__name__)
