@@ -16,6 +16,13 @@ from charmed_kubeflow_chisme.testing import (
     deploy_and_assert_grafana_agent,
     get_alert_rules,
 )
+from charms_dependencies import (
+    ISTIO_GATEWAY,
+    ISTIO_PILOT,
+    KUBEFLOW_DASHBOARD,
+    KUBEFLOW_PROFILES,
+    OIDC_GATEKEEPER,
+)
 from lightkube.resources.apps_v1 import StatefulSet
 from lightkube.resources.core_v1 import Service
 from pytest_operator.plugin import OpsTest
@@ -28,37 +35,13 @@ from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_expone
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 CHARM_ROOT = "."
-DEX_AUTH = "dex-auth"
 DEX_AUTH_APP_NAME = METADATA["name"]
 DEX_AUTH_TRUST = True
 DEX_AUTH_CONFIG = {
     "static-username": "admin",
     "static-password": "foobar",
 }
-
-OIDC_GATEKEEPER = "oidc-gatekeeper"
-OIDC_GATEKEEPER_CHANNEL = "ckf-1.10/stable"
-OIDC_GATEKEEPER_CONFIG = {
-    "client-name": "Ambassador Auth OIDC",
-    "client-secret": "oidc-client-secret",
-}
-
-ISTIO_OPERATORS_CHANNEL = "1.24/stable"
-ISTIO_PILOT = "istio-pilot"
-ISTIO_PILOT_TRUST = True
-ISTIO_PILOT_CONFIG = {"default-gateway": "kubeflow-gateway"}
-ISTIO_GATEWAY = "istio-gateway"
 ISTIO_GATEWAY_APP_NAME = "istio-ingressgateway"
-ISTIO_GATEWAY_TRUST = True
-ISTIO_GATEWAY_CONFIG = {"kind": "ingress"}
-
-KUBEFLOW_PROFILES = "kubeflow-profiles"
-KUBEFLOW_PROFILES_CHANNEL = "1.10/stable"
-KUBEFLOW_PROFILES_TRUST = True
-
-KUBEFLOW_DASHBOARD = "kubeflow-dashboard"
-KUBEFLOW_DASHBOARD_CHANNEL = "1.10/stable"
-KUBEFLOW_DASHBOARD_TRUST = True
 
 log = logging.getLogger(__name__)
 
@@ -105,69 +88,73 @@ def test_statefulset_readiness(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_relations(ops_test: OpsTest):
     await ops_test.model.deploy(
-        entity_url=ISTIO_PILOT,
-        channel=ISTIO_OPERATORS_CHANNEL,
-        config=ISTIO_PILOT_CONFIG,
-        trust=ISTIO_PILOT_TRUST,
+        entity_url=ISTIO_PILOT.charm,
+        channel=ISTIO_PILOT.channel,
+        config=ISTIO_PILOT.config,
+        trust=ISTIO_PILOT.trust,
     )
 
     await ops_test.model.deploy(
-        entity_url=ISTIO_GATEWAY,
+        entity_url=ISTIO_GATEWAY.charm,
         application_name=ISTIO_GATEWAY_APP_NAME,
-        channel=ISTIO_OPERATORS_CHANNEL,
-        config=ISTIO_GATEWAY_CONFIG,
-        trust=ISTIO_GATEWAY_TRUST,
+        channel=ISTIO_GATEWAY.channel,
+        config=ISTIO_GATEWAY.config,
+        trust=ISTIO_GATEWAY.trust,
     )
     await ops_test.model.add_relation(
-        ISTIO_PILOT,
+        ISTIO_PILOT.charm,
         ISTIO_GATEWAY_APP_NAME,
     )
 
     await ops_test.model.wait_for_idle(
-        [ISTIO_PILOT, ISTIO_GATEWAY_APP_NAME],
+        [ISTIO_PILOT.charm, ISTIO_GATEWAY_APP_NAME],
         raise_on_blocked=False,
         status="active",
         timeout=90 * 10,
     )
 
     await ops_test.model.deploy(
-        OIDC_GATEKEEPER,
-        channel=OIDC_GATEKEEPER_CHANNEL,
-        config=OIDC_GATEKEEPER_CONFIG,
+        OIDC_GATEKEEPER.charm,
+        channel=OIDC_GATEKEEPER.channel,
+        config=OIDC_GATEKEEPER.config,
     )
     await ops_test.model.add_relation(
-        f"{OIDC_GATEKEEPER}:dex-oidc-config", f"{DEX_AUTH_APP_NAME}:dex-oidc-config"
+        f"{OIDC_GATEKEEPER.charm}:dex-oidc-config", f"{DEX_AUTH_APP_NAME}:dex-oidc-config"
     )
     await ops_test.model.add_relation(
-        f"{OIDC_GATEKEEPER}:oidc-client", f"{DEX_AUTH_APP_NAME}:oidc-client"
+        f"{OIDC_GATEKEEPER.charm}:oidc-client", f"{DEX_AUTH_APP_NAME}:oidc-client"
     )
-    await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{DEX_AUTH_APP_NAME}:ingress")
     await ops_test.model.add_relation(
-        f"{ISTIO_PILOT}:ingress-auth",
-        f"{OIDC_GATEKEEPER}:ingress-auth",
+        f"{ISTIO_PILOT.charm}:ingress", f"{DEX_AUTH_APP_NAME}:ingress"
+    )
+    await ops_test.model.add_relation(
+        f"{ISTIO_PILOT.charm}:ingress-auth",
+        f"{OIDC_GATEKEEPER.charm}:ingress-auth",
     )
 
     await ops_test.model.deploy(
-        KUBEFLOW_PROFILES,
-        channel=KUBEFLOW_PROFILES_CHANNEL,
-        trust=KUBEFLOW_PROFILES_TRUST,
+        KUBEFLOW_PROFILES.charm,
+        channel=KUBEFLOW_PROFILES.channel,
+        trust=KUBEFLOW_PROFILES.trust,
     )
     await ops_test.model.deploy(
-        KUBEFLOW_DASHBOARD,
-        channel=KUBEFLOW_DASHBOARD_CHANNEL,
-        trust=KUBEFLOW_DASHBOARD_TRUST,
+        KUBEFLOW_DASHBOARD.charm,
+        channel=KUBEFLOW_DASHBOARD.channel,
+        trust=KUBEFLOW_DASHBOARD.trust,
     )
-    await ops_test.model.add_relation(KUBEFLOW_PROFILES, KUBEFLOW_DASHBOARD)
-    await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{KUBEFLOW_DASHBOARD}:ingress")
+    await ops_test.model.add_relation(KUBEFLOW_PROFILES.charm, KUBEFLOW_DASHBOARD.charm)
+    await ops_test.model.add_relation(
+        f"{ISTIO_PILOT.charm}:ingress", f"{KUBEFLOW_DASHBOARD.charm}:ingress"
+    )
 
     await ops_test.model.wait_for_idle(
         apps=[
             DEX_AUTH_APP_NAME,
-            ISTIO_PILOT,
+            ISTIO_PILOT.charm,
             ISTIO_GATEWAY_APP_NAME,
-            OIDC_GATEKEEPER,
-            KUBEFLOW_PROFILES,
-            KUBEFLOW_DASHBOARD,
+            OIDC_GATEKEEPER.charm,
+            KUBEFLOW_PROFILES.charm,
+            KUBEFLOW_DASHBOARD.charm,
         ],
         status="active",
         raise_on_blocked=False,
@@ -194,7 +181,7 @@ async def driver(ops_test: OpsTest):
 
     # Oidc may get blocked and recreate the unit
     await ops_test.model.wait_for_idle(
-        [DEX_AUTH_APP_NAME, OIDC_GATEKEEPER],
+        [DEX_AUTH_APP_NAME, OIDC_GATEKEEPER.charm],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
