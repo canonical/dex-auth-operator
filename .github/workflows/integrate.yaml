@@ -22,11 +22,6 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v5.3.0
-      with:
-        python-version: 3.8
-
     - run: pip install tox
     - run: tox -vve lint
 
@@ -37,11 +32,6 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v5.3.0
-        with:
-          python-version: 3.8
-        
       - run: pip install tox
       - run: tox -e unit
 
@@ -58,11 +48,6 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v5.3.0
-        with:
-          python-version: 3.8
-        
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
