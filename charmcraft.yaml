@@ -23,7 +23,7 @@ parts:
       # Use environment variable instead of `--break-system-packages` to avoid failing on older
       # versions of pip that do not recognize `--break-system-packages`
       # `--user` needed (in addition to `--break-system-packages`) for Ubuntu >=24.04
-      PIP_BREAK_SYSTEM_PACKAGES=true python3 -m pip install --user --upgrade pip==24.3.1  # renovate: charmcraft-pip-latest
+      PIP_BREAK_SYSTEM_PACKAGES=true python3 -m pip install --user --upgrade pip==25.1.1  # renovate: charmcraft-pip-latest
 
   # "charm-python" part name is arbitrary; use for consistency
   # Avoid using "charm" part name since that has special meaning to charmcraft
