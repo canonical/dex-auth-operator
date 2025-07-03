@@ -22,7 +22,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       
-    - run: pip install tox
+    - run: pipx install tox
     - run: tox -vve lint
 
   unit-test:
@@ -32,7 +32,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - run: pip install tox
+      - run: pipx install tox
       - run: tox -e unit
 
   terraform-checks:
