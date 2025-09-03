@@ -92,4 +92,4 @@ resources:
     description: OCI image for dex container
     # Integrating the rock requires running the Pebble service as a non-root user
     # See: https://github.com/canonical/kfp-operators/issues/675
-    upstream-source: charmedkubeflow/dex:2.41.1-1d3fe19
+    upstream-source: docker.io/charmedkubeflow/dex:2.41.1-cc0935f
