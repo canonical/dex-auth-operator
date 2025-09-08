@@ -20,7 +20,7 @@ from ops import main
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
-from ops.pebble import Layer
+from ops.pebble import ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interface
 
 METRICS_PATH = "/metrics"
@@ -148,7 +148,15 @@ class Operator(CharmBase):
             self.logger.info("Updated dex config")
 
         # Using restart due to https://github.com/canonical/dex-auth-operator/issues/63
-        self._container.restart(self._container_name)
+        try:
+            self._container.restart(self._container_name)
+        except ChangeError:
+            raise ErrorWithStatus(
+                f"Error when restarting container '{self._container}'."
+                " This may be transient, but if it persists it is likely an error.",
+                WaitingStatus,
+            )
+            
 
     def ensure_state(self):
         self.state.set_default(
