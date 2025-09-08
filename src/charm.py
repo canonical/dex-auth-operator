@@ -150,13 +150,12 @@ class Operator(CharmBase):
         # Using restart due to https://github.com/canonical/dex-auth-operator/issues/63
         try:
             self._container.restart(self._container_name)
-        except ChangeError:
+        except ChangeError as error:
             raise ErrorWithStatus(
-                f"Error when restarting container '{self._container}'."
+                f"Error when restarting container '{self._container}': {error.err}"
                 " This may be transient, but if it persists it is likely an error.",
                 WaitingStatus,
             )
-            
 
     def ensure_state(self):
         self.state.set_default(
