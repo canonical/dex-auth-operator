@@ -91,7 +91,7 @@ class Operator(CharmBase):
                 self._container_name: {
                     "override": "replace",
                     "summary": "entrypoint of the dex-auth-operator image",
-                    "command": f"{self._entrypoint} dexx serve {self._dex_config_path}",
+                    "command": f"{self._entrypoint} dex serve {self._dex_config_path}",
                     "startup": "enabled",
                     "user": "_daemon_",
                     "environment": {
