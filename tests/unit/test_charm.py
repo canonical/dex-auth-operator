@@ -147,9 +147,10 @@ def test_update_layer_error_raises(harness):
     container.restart = mock_restart
     # Mock container.pull() so that we reach container.restart()
     container.pull = MagicMock(return_value=io.StringIO("old-config-value"))
-
     harness.charm.on.upgrade_charm.emit()
+
     assert isinstance(harness.charm.model.unit.status, WaitingStatus)
+    assert "Error when restarting container" in harness.charm.model.unit.status.message
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
