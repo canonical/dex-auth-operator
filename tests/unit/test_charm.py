@@ -1,12 +1,14 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-from unittest.mock import patch
+import io
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.pebble import ChangeError
 from ops.testing import Harness
 
 from charm import Operator
@@ -129,6 +131,25 @@ def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
     else:
         assert len(static_passwords) == 1
         assert harness.model.config["static-username"] == static_passwords[0].get("username")
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+def test_update_layer_error_raises(harness):
+    """Test that _update_layer() sets the proper status when the container cannot be restarted."""
+    harness.set_leader(True)
+    harness.begin()
+    harness.set_can_connect("dex", True)
+
+    # Mock a ChangeError when container.restart() is called
+    mock_restart = MagicMock()
+    mock_restart.side_effect = ChangeError("Mock ChangeError", MagicMock())
+    container = harness.charm.model.unit.get_container(harness.charm._container_name)
+    container.restart = mock_restart
+    # Mock container.pull() so that we reach container.restart()
+    container.pull = MagicMock(return_value=io.StringIO("old-config-value"))
+
+    harness.charm.on.upgrade_charm.emit()
+    assert isinstance(harness.charm.model.unit.status, WaitingStatus)
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
