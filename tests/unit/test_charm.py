@@ -153,7 +153,7 @@ def test_update_layer_too_many_requests_waiting_status(harness):
     # Mock container.pull() so that we reach container.restart()
     container.pull = MagicMock(return_value=io.StringIO("old-config-value"))
 
-    harness.charm.on.upgrade_charm.emit()
+    harness.charm.on.install.emit()
 
     assert isinstance(harness.charm.model.unit.status, WaitingStatus)
     assert "Too Many API Requests" in harness.charm.model.unit.status.message
@@ -181,7 +181,7 @@ def test_update_layer_changeerror_raises(harness):
     container.pull = MagicMock(return_value=io.StringIO("old-config-value"))
 
     with pytest.raises(ChangeError) as error:
-        harness.charm.on.upgrade_charm.emit()
+        harness.charm.on.install.emit()
 
     # Assert that this ChangeError isn't caught by the charm code
     assert error.value is error_to_raise
