@@ -91,7 +91,7 @@ class Operator(CharmBase):
                 self._container_name: {
                     "override": "replace",
                     "summary": "entrypoint of the dex-auth-operator image",
-                    "command": f"{self._entrypoint} dex serve {self._dex_config_path}",
+                    "command": f"{self._entrypoint} dexx serve {self._dex_config_path}",
                     "startup": "enabled",
                     "user": "_daemon_",
                     "environment": {
@@ -150,12 +150,24 @@ class Operator(CharmBase):
         # Using restart due to https://github.com/canonical/dex-auth-operator/issues/63
         try:
             self._container.restart(self._container_name)
-        except ChangeError as error:
-            raise ErrorWithStatus(
-                f"Error when restarting container '{self._container}': {error.err}"
-                " This may be transient, but if it persists it is likely an error.",
-                WaitingStatus,
+        except ChangeError as change_error:
+            # Check if workload container fails due to too many API requests (response code 429)
+            # If so, set the status to Waiting, the problem should resolve when the container
+            # restarts
+            found_error = any(
+                "Too Many Requests" in log_entry
+                for task in change_error.change.tasks
+                for log_entry in task.log
             )
+
+            if found_error:
+                raise ErrorWithStatus(
+                    f"Too Many API Requests from container '{self._container}': {change_error.err}"
+                    " This may be transient, but if it persists it is likely an error.",
+                    WaitingStatus,
+                )
+            else:
+                raise
 
     def ensure_state(self):
         self.state.set_default(
