@@ -154,6 +154,7 @@ class Operator(CharmBase):
             # Check if workload container fails due to too many API requests (response code 429)
             # If so, set the status to Waiting, the problem should resolve when the container
             # restarts
+            # See: https://github.com/canonical/istio-operators/issues/647
             found_error = any(
                 "Too Many Requests" in log_entry
                 for task in change_error.change.tasks
