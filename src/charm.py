@@ -20,7 +20,7 @@ from ops import main
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
-from ops.pebble import Layer
+from ops.pebble import ChangeError, Layer
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interface
 
 METRICS_PATH = "/metrics"
@@ -148,7 +148,27 @@ class Operator(CharmBase):
             self.logger.info("Updated dex config")
 
         # Using restart due to https://github.com/canonical/dex-auth-operator/issues/63
-        self._container.restart(self._container_name)
+        try:
+            self._container.restart(self._container_name)
+        except ChangeError as change_error:
+            # Check if workload container fails due to too many API requests (response code 429)
+            # If so, set the status to Waiting, the problem should resolve when the container
+            # restarts
+            # See: https://github.com/canonical/istio-operators/issues/647
+            found_error = any(
+                "Too Many Requests" in log_entry
+                for task in change_error.change.tasks
+                for log_entry in task.log
+            )
+
+            if found_error:
+                raise ErrorWithStatus(
+                    f"Too Many API Requests from container '{self._container}': {change_error.err}"
+                    " This may be transient, but if it persists it is likely an error.",
+                    WaitingStatus,
+                )
+            else:
+                raise
 
     def ensure_state(self):
         self.state.set_default(
