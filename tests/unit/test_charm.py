@@ -1,12 +1,14 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-from unittest.mock import patch
+import io
+from unittest.mock import MagicMock, patch
 
 import pytest
 import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.pebble import Change, ChangeError, Task
 from ops.testing import Harness
 
 from charm import Operator
@@ -129,6 +131,60 @@ def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
     else:
         assert len(static_passwords) == 1
         assert harness.model.config["static-username"] == static_passwords[0].get("username")
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+def test_update_layer_too_many_requests_waiting_status(harness):
+    """Test that _update_layer() sets the proper status if the container sends too many requests."""
+    harness.set_leader(True)
+    harness.begin()
+    harness.set_can_connect("dex", True)
+
+    # Mock a Task for ChangeError
+    mock_task = MagicMock(spec=Task)
+    mock_task.log = ["Too Many Requests in this container."]
+
+    # Mock a Change for ChangeError
+    mock_change = MagicMock(spec=Change)
+    mock_change.tasks = [mock_task]
+
+    container = harness.charm.model.unit.get_container(harness.charm._container_name)
+    container.restart = MagicMock(side_effect=ChangeError("Mock ChangeError", mock_change))
+    # Mock container.pull() so that we reach container.restart()
+    container.pull = MagicMock(return_value=io.StringIO("old-config-value"))
+
+    harness.charm.on.install.emit()
+
+    assert isinstance(harness.charm.model.unit.status, WaitingStatus)
+    assert "Too Many API Requests" in harness.charm.model.unit.status.message
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+def test_update_layer_changeerror_raises(harness):
+    """Test that _update_layer() reraises the ChangeError if there aren't too many API requests."""
+    harness.set_leader(True)
+    harness.begin()
+    harness.set_can_connect("dex", True)
+
+    # Mock a Task for ChangeError
+    mock_task = MagicMock(spec=Task)
+    mock_task.log = ["Sample log file that doesn't include a specific error."]
+
+    # Mock a Change for ChangeError
+    mock_change = MagicMock(spec=Change)
+    mock_change.tasks = [mock_task]
+
+    error_to_raise = ChangeError("Mock ChangeError", mock_change)
+    container = harness.charm.model.unit.get_container(harness.charm._container_name)
+    container.restart = MagicMock(side_effect=error_to_raise)
+    # Mock container.pull() so that we reach container.restart()
+    container.pull = MagicMock(return_value=io.StringIO("old-config-value"))
+
+    with pytest.raises(ChangeError) as error:
+        harness.charm.on.install.emit()
+
+    # Assert that this ChangeError isn't caught by the charm code
+    assert error.value is error_to_raise
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
