@@ -37,6 +37,9 @@ class Operator(CharmBase):
         self.logger: logging.Logger = logging.getLogger(__name__)
         self._namespace = self.model.name
 
+        self._owasp_logger = OWASPLogger(appid="dex.owasp-logger")
+        self.state.set_default(last_static_password="")
+
         # Patch the service to correctly expose the ports to be used
         dex_port = ServicePort(int(self.model.config["port"]), name="dex")
         metrics_port = ServicePort(int(METRICS_PORT), name="metrics-port")
@@ -229,11 +232,8 @@ class Operator(CharmBase):
         self.model.unit.status = ActiveStatus()
 
     def log_owasp_events(self, event):
-        owasp_logger = OWASPLogger(appid="dex.owasp-logger")
-        self.state.set_default(last_static_password="")
-
         if not isinstance(event, ConfigChangedEvent):
-            self.logger.info("Not a config changed-event. Won't log any OWASP event.")
+            self.logger.debug("Not a config changed-event. Won't log any OWASP event.")
             return
 
         self.logger.info("config-changed event detected. Checking if password changed.")
@@ -243,7 +243,7 @@ class Operator(CharmBase):
         if config_password != stored_password:
             user = str(self.model.config.get("static-username"))
             desc = f"The password for user '{user}' was changed."
-            owasp_logger.authn_password_change(userid=user, description=desc)
+            self._owasp_logger.authn_password_change(userid=user, description=desc)
 
         self.state.last_static_password = config_password
 
