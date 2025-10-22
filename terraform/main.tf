@@ -1,6 +1,7 @@
 resource "juju_application" "dex_auth" {
   charm {
     name     = "dex-auth"
+    base     = var.base
     channel  = var.channel
     revision = var.revision
   }
