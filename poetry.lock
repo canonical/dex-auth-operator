@@ -2143,6 +2143,21 @@ files = [
 attrs = ">=19.2.0"
 
 [[package]]
+name = "owasp-logger"
+version = "0.1.4"
+description = "OWASP-compliant structured security event logger for Python applications."
+optional = false
+python-versions = ">=3.8"
+groups = ["charm"]
+files = [
+    {file = "owasp_logger-0.1.4-py3-none-any.whl", hash = "sha256:9b1b53f8b08d2933244a969fb3f56b5029713d5e46b3422e978d111dfc2f0ff8"},
+    {file = "owasp_logger-0.1.4.tar.gz", hash = "sha256:8ce5228ffa0665369677090913d72db2bd1481078e2261e6a4432be4516c6b06"},
+]
+
+[package.extras]
+otel = ["opentelemetry-api", "opentelemetry-instrumentation", "opentelemetry-sdk"]
+
+[[package]]
 name = "packaging"
 version = "26.0"
 description = "Core utilities for Python packages"
@@ -3827,4 +3842,4 @@ cffi = ["cffi (>=1.17,<2.0) ; platform_python_implementation != \"PyPy\" and pyt
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "0dac5b836a931044416ac3fde1e5fff21a36d844029cba7da14025c7b8a4e791"
+content-hash = "ac223411d676def806ae8cb1eb64c4969a02e8856382db6fd3e762b812e34211"
