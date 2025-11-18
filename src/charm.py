@@ -12,6 +12,17 @@ import yaml
 from charmed_kubeflow_chisme.exceptions import ErrorWithStatus
 from charms.dex_auth.v0.dex_oidc_config import DexOidcConfigProvider
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.istio_beacon_k8s.v0.service_mesh import AppPolicy, ServiceMeshConsumer, UnitPolicy
+from charms.istio_ingress_k8s.v0.istio_ingress_route import (
+    BackendRef,
+    HTTPPathMatch,
+    HTTPRoute,
+    HTTPRouteMatch,
+    IstioIngressRouteConfig,
+    IstioIngressRouteRequirer,
+    Listener,
+    ProtocolType,
+)
 from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
@@ -68,6 +79,19 @@ class Operator(CharmBase):
         self.dashboard_provider = GrafanaDashboardProvider(self)
         self._logging = LogForwarder(charm=self)
 
+        # Ambient Mesh integration
+        self._mesh = ServiceMeshConsumer(
+            self,
+            policies=[
+                AppPolicy(relation="dex-oidc-config", endpoints=[]),
+                UnitPolicy(relation="metrics-endpoint"),
+            ],
+        )
+        self.ingress_unauthenticated = IstioIngressRouteRequirer(
+            self, relation_name="istio-ingress-route-unauthenticated"
+        )
+        self._ambient_mesh_ingress()
+
         self._container_name = "dex"
         self._container = self.unit.get_container(self._container_name)
         self._entrypoint = "/usr/local/bin/docker-entrypoint"
@@ -83,6 +107,10 @@ class Operator(CharmBase):
             self.on.dex_pebble_ready,
         ]:
             self.framework.observe(event, self.main)
+
+    @property
+    def _port(self) -> int:
+        return int(self.model.config["port"])
 
     @property
     def _dex_auth_layer(self) -> Layer:
@@ -123,9 +151,29 @@ class Operator(CharmBase):
             if not public_url.startswith(("http://", "https://")):
                 public_url = f"http://{public_url}"
             return f"{public_url}/dex"
-        return (
-            f"http://{self.model.app.name}.{self._namespace}.svc:{self.model.config['port']}/dex"
+        return f"http://{self.model.app.name}.{self._namespace}.svc:{self._port}/dex"
+
+    def _ambient_mesh_ingress(self):
+        if not self.unit.is_leader():
+            return
+
+        http_listener = Listener(port=80, protocol=ProtocolType.HTTP)
+
+        config = IstioIngressRouteConfig(
+            model=self.model.name,
+            listeners=[http_listener],
+            http_routes=[
+                HTTPRoute(
+                    name="http-ingress",
+                    listener=http_listener,
+                    matches=[HTTPRouteMatch(path=HTTPPathMatch(value="/dex/"))],
+                    backends=[BackendRef(service=self.app.name, port=self._port)],
+                )
+            ],
         )
+
+        # if self.unit.is_leader():
+        self.ingress_unauthenticated.submit_config(config)
 
     def _update_layer(self) -> None:
         """Updates the Pebble configuration layer if changed."""
@@ -191,7 +239,7 @@ class Operator(CharmBase):
             "prefix": "/dex",
             "rewrite": "/dex",
             "service": self.model.app.name,
-            "port": self.model.config["port"],
+            "port": self._port,
         }
 
         interface.send_data(data)
@@ -260,7 +308,6 @@ class Operator(CharmBase):
 
         # Load config values as convenient variables
         connectors = yaml.safe_load(self.model.config["connectors"])
-        port = self.model.config["port"]
 
         enable_password_db = self.model.config["enable-password-db"]
         static_config = {
@@ -295,7 +342,7 @@ class Operator(CharmBase):
             {
                 "issuer": self._issuer_url,
                 "storage": {"type": "kubernetes", "config": {"inCluster": True}},
-                "web": {"http": f"0.0.0.0:{port}"},
+                "web": {"http": f"0.0.0.0:{self._port}"},
                 "telemetry": {"http": "0.0.0.0:5558"},
                 "logger": {"level": "debug", "format": "text"},
                 "oauth2": {"skipApprovalScreen": True},
