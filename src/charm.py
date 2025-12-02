@@ -97,7 +97,6 @@ class Operator(CharmBase):
                     "summary": "entrypoint of the dex-auth-operator image",
                     "command": f"{self._entrypoint} dex serve {self._dex_config_path}",
                     "startup": "enabled",
-                    "user": "_daemon_",
                     "environment": {
                         "KUBERNETES_POD_NAMESPACE": self._namespace,
                     },
