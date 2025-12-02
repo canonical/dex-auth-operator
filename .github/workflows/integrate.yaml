@@ -67,6 +67,10 @@ jobs:
           sudo apt-get install chromium-chromedriver
           tox -e integration -- --model kubeflow
 
+      - name: Setup tmate session
+        if: failure()
+        uses: mxschmitt/action-tmate@v3
+
       - name: Get istio gateway
         run: kubectl get gateway -A
         if: failure()
