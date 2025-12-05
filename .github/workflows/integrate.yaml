@@ -79,6 +79,10 @@ jobs:
         run: juju status --relations
         if: failure()
 
+      - name: Get juju debug-log
+        run: juju debug-log --replay --no-tail
+        if: failure()
+
       - name: Get oidc-gatekeeper workload logs
         run: kubectl logs -l app.kubernetes.io/name=oidc-gatekeeper -n kubeflow
         if: failure()
