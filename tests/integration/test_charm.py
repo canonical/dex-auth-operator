@@ -9,13 +9,7 @@ import lightkube
 import pytest
 import yaml
 from charmed_kubeflow_chisme.testing import (
-    APP_GRAFANA_DASHBOARD,
-    APP_LOGGING,
-    APP_METRICS_ENDPOINT,
     GRAFANA_AGENT_APP,
-    GRAFANA_AGENT_GRAFANA_DASHBOARD,
-    GRAFANA_AGENT_LOGGING_PROVIDER,
-    GRAFANA_AGENT_METRICS_ENDPOINT,
     assert_alert_rules,
     assert_logging,
     assert_metrics_endpoint,
@@ -78,45 +72,8 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
 
     # Deploying grafana-agent-k8s and add all relations
-    await ops_test.model.deploy(GRAFANA_AGENT_APP, channel="1/stable")
-    log.info(
-        "Adding relation: %s:%s and %s:%s",
-        DEX_AUTH_APP_NAME,
-        APP_GRAFANA_DASHBOARD,
-        GRAFANA_AGENT_APP,
-        GRAFANA_AGENT_GRAFANA_DASHBOARD,
-    )
-    await ops_test.model.integrate(
-        f"{DEX_AUTH_APP_NAME}:{APP_GRAFANA_DASHBOARD}",
-        f"{GRAFANA_AGENT_APP}:{GRAFANA_AGENT_GRAFANA_DASHBOARD}",
-    )
-    log.info(
-        "Adding relation: %s:%s and %s:%s",
-        DEX_AUTH_APP_NAME,
-        APP_METRICS_ENDPOINT,
-        GRAFANA_AGENT_APP,
-        GRAFANA_AGENT_METRICS_ENDPOINT,
-    )
-    await ops_test.model.integrate(
-        f"{DEX_AUTH_APP_NAME}:{APP_METRICS_ENDPOINT}",
-        f"{GRAFANA_AGENT_APP}:{GRAFANA_AGENT_METRICS_ENDPOINT}",
-    )
-    log.info(
-        "Adding relation: %s:%s and %s:%s",
-        DEX_AUTH_APP_NAME,
-        APP_LOGGING,
-        GRAFANA_AGENT_APP,
-        GRAFANA_AGENT_LOGGING_PROVIDER,
-    )
-    await ops_test.model.integrate(
-        f"{DEX_AUTH_APP_NAME}:{APP_LOGGING}",
-        f"{GRAFANA_AGENT_APP}:{GRAFANA_AGENT_LOGGING_PROVIDER}",
-    )
-    await ops_test.model.wait_for_idle(
-        apps=[GRAFANA_AGENT_APP],
-        status="blocked",
-        timeout=600,
-        idle_period=60,
+    await deploy_and_assert_grafana_agent(
+        ops_test.model, DEX_AUTH_APP_NAME, metrics=True, dashboard=True, logging=True
     )
 
 
