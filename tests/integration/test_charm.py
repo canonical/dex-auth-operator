@@ -154,7 +154,7 @@ async def test_relations(ops_test: OpsTest):
         config=ISTIO_GATEWAY.config,
         trust=ISTIO_GATEWAY.trust,
     )
-    await ops_test.model.relate(
+    await ops_test.model.integrate(
         ISTIO_PILOT.charm,
         ISTIO_GATEWAY_APP_NAME,
     )
@@ -171,14 +171,14 @@ async def test_relations(ops_test: OpsTest):
         channel=OIDC_GATEKEEPER.channel,
         config=OIDC_GATEKEEPER.config,
     )
-    await ops_test.model.relate(
+    await ops_test.model.integrate(
         f"{OIDC_GATEKEEPER.charm}:dex-oidc-config", f"{DEX_AUTH_APP_NAME}:dex-oidc-config"
     )
-    await ops_test.model.relate(
+    await ops_test.model.integrate(
         f"{OIDC_GATEKEEPER.charm}:oidc-client", f"{DEX_AUTH_APP_NAME}:oidc-client"
     )
-    await ops_test.model.relate(f"{ISTIO_PILOT.charm}:ingress", f"{DEX_AUTH_APP_NAME}:ingress")
-    await ops_test.model.relate(
+    await ops_test.model.integrate(f"{ISTIO_PILOT.charm}:ingress", f"{DEX_AUTH_APP_NAME}:ingress")
+    await ops_test.model.integrate(
         f"{ISTIO_PILOT.charm}:ingress-auth",
         f"{OIDC_GATEKEEPER.charm}:ingress-auth",
     )
@@ -193,10 +193,10 @@ async def test_relations(ops_test: OpsTest):
         channel=KUBEFLOW_DASHBOARD.channel,
         trust=KUBEFLOW_DASHBOARD.trust,
     )
-    await ops_test.model.relate(
-        f"{KUBEFLOW_PROFILES.charm}:kubeflow-profiles, {KUBEFLOW_DASHBOARD.charm}:kubeflow-profiles"
+    await ops_test.model.integrate(
+        f"{KUBEFLOW_PROFILES.charm}:kubeflow-profiles", f"{KUBEFLOW_DASHBOARD.charm}:kubeflow-profiles"
     )
-    await ops_test.model.relate(
+    await ops_test.model.integrate(
         f"{ISTIO_PILOT.charm}:ingress", f"{KUBEFLOW_DASHBOARD.charm}:ingress"
     )
 
