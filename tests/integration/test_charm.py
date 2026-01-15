@@ -58,7 +58,7 @@ def lightkube_client() -> lightkube.Client:
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test):
+async def test_build_and_deploy(ops_test: OpsTest):
     my_charm = await ops_test.build_charm(".")
     dex_image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     await ops_test.model.deploy(
@@ -218,13 +218,13 @@ async def driver(ops_test: OpsTest, lightkube_client: lightkube.Client):
         driver.get_screenshot_as_file("/tmp/selenium-dashboard.png")
 
 
-def fix_queryselector(elems):
+def fix_queryselector(elems: list[str]):
     selectors = '").shadowRoot.querySelector("'.join(elems)
     return 'return document.querySelector("' + selectors + '")'
 
 
-def test_login(driver):
-    driver, wait, url = driver
+def test_login(driver: webdriver.Chrome):
+    driver, wait, _ = driver
 
     driver.get_screenshot_as_file("/tmp/selenium-logon.png")
     # Log in using dex credentials
@@ -237,7 +237,7 @@ def test_login(driver):
     wait.until(lambda x: x.execute_script(script))
 
 
-async def test_alert_rules(ops_test):
+async def test_alert_rules(ops_test: OpsTest):
     """Test check charm alert rules and rules defined in relation data bag."""
     app = ops_test.model.applications[DEX_AUTH_APP_NAME]
     alert_rules = get_alert_rules()
@@ -245,7 +245,7 @@ async def test_alert_rules(ops_test):
     await assert_alert_rules(app, alert_rules)
 
 
-async def test_metrics_endpoint(ops_test):
+async def test_metrics_endpoint(ops_test: OpsTest):
     """Test metrics_endpoints are defined in relation data bag and their accessibility.
 
     This function gets all the metrics_endpoints from the relation data bag, checks if
@@ -256,7 +256,7 @@ async def test_metrics_endpoint(ops_test):
     await assert_metrics_endpoint(app, metrics_port=5558, metrics_path="/metrics")
 
 
-async def test_logging(ops_test):
+async def test_logging(ops_test: OpsTest):
     """Test logging is defined in relation data bag."""
     app = ops_test.model.applications[GRAFANA_AGENT_APP]
     await assert_logging(app)
