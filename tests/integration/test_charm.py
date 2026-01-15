@@ -151,7 +151,8 @@ async def test_relations(ops_test: OpsTest):
         trust=KUBEFLOW_DASHBOARD.trust,
     )
     await ops_test.model.integrate(
-        f"{KUBEFLOW_PROFILES.charm}:kubeflow-profiles", f"{KUBEFLOW_DASHBOARD.charm}:kubeflow-profiles"
+        f"{KUBEFLOW_PROFILES.charm}:kubeflow-profiles",
+        f"{KUBEFLOW_DASHBOARD.charm}:kubeflow-profiles",
     )
     await ops_test.model.integrate(
         f"{ISTIO_PILOT.charm}:ingress", f"{KUBEFLOW_DASHBOARD.charm}:ingress"
