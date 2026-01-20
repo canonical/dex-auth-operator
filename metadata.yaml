@@ -86,6 +86,8 @@ provides:
 containers:
   dex:
     resource: oci-image
+    uid: 584792
+    gid: 584792
 resources:
   oci-image:
     type: oci-image
@@ -93,3 +95,4 @@ resources:
     # Integrating the rock requires running the Pebble service as a non-root user
     # See: https://github.com/canonical/kfp-operators/issues/675
     upstream-source: charmedkubeflow/dex:2.41.1-1d3fe19
+charm-user: non-root
