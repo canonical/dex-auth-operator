@@ -47,6 +47,13 @@ ISTIO_INGRESS_K8S = "istio-ingress-k8s"
 log = logging.getLogger(__name__)
 
 
+@pytest.fixture(scope="session")
+def lightkube_client() -> lightkube.Client:
+    """Returns lightkube Kubernetes client"""
+    client = lightkube.Client(field_manager=f"{DEX_AUTH_APP_NAME}")
+    return client
+
+
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test):
     my_charm = await ops_test.build_charm(".")
