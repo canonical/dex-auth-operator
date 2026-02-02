@@ -273,6 +273,40 @@ def test_main_ingress(update, harness):
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+def test_ambient_mesh_ingress_leader_calls_submit_config(harness):
+    """Test that submit_config is called exactly once when unit is leader."""
+    harness.set_leader(True)
+    harness.begin()
+
+    # Mock the submit_config method to track calls
+    with patch.object(
+        harness.charm.ingress_unauthenticated, "submit_config"
+    ) as mock_submit_config:
+        # Call the method that should trigger submit_config
+        harness.charm._ambient_mesh_ingress()
+
+        # Verify submit_config was called exactly once
+        mock_submit_config.assert_called_once()
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+def test_ambient_mesh_ingress_non_leader_does_not_call_submit_config(harness):
+    """Test that submit_config is never called when unit is not leader."""
+    harness.set_leader(False)
+    harness.begin()
+
+    # Mock the submit_config method to track calls
+    with patch.object(
+        harness.charm.ingress_unauthenticated, "submit_config"
+    ) as mock_submit_config:
+        # Call the method that should NOT trigger submit_config
+        harness.charm._ambient_mesh_ingress()
+
+        # Verify submit_config was never called
+        mock_submit_config.assert_not_called()
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_dex_oidc_config_with_data(harness):
     """Test the relation data has values by default as the charm is broadcasting them."""
     harness.begin()
