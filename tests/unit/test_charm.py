@@ -18,7 +18,10 @@ DEX_OIDC_CONFIG_RELATION = "dex-oidc-config"
 
 @pytest.fixture
 def harness():
-    return Harness(Operator)
+    harness = Harness(Operator)
+    harness.set_leader(True)
+    harness.set_model_name("some-model")
+    return harness
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
@@ -30,6 +33,7 @@ def test_log_forwarding(harness):
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_not_leader(harness):
+    harness.set_leader(False)
     harness.begin_with_initial_hooks()
     assert isinstance(harness.charm.model.unit.status, WaitingStatus)
     assert (
@@ -50,7 +54,6 @@ def ensure_state(self):
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 @patch("charm.Operator._update_layer")
 def test_install_event(update, harness):
-    harness.set_leader(True)
     harness.begin()
     harness.set_can_connect("dex", True)
     harness.charm.on.install.emit()
@@ -107,7 +110,6 @@ def test_generate_dex_auth_config_raises(harness):
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
     """Check the method returns dex-auth configuration when different settings are provided."""
-    harness.set_leader(True)
     harness.begin()
     harness.set_can_connect("dex", True)
 
@@ -136,7 +138,6 @@ def test_generate_dex_auth_config_returns(update_layer, dex_config, harness):
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_update_layer_too_many_requests_waiting_status(harness):
     """Test that _update_layer() sets the proper status if the container sends too many requests."""
-    harness.set_leader(True)
     harness.begin()
     harness.set_can_connect("dex", True)
 
@@ -162,7 +163,6 @@ def test_update_layer_too_many_requests_waiting_status(harness):
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_update_layer_changeerror_raises(harness):
     """Test that _update_layer() reraises the ChangeError if there aren't too many API requests."""
-    harness.set_leader(True)
     harness.begin()
     harness.set_can_connect("dex", True)
 
@@ -189,7 +189,6 @@ def test_update_layer_changeerror_raises(harness):
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_disable_static_login_no_connector_blocked_status(harness):
-    harness.set_leader(True)
     harness.begin()
     harness.set_can_connect("dex", True)
 
@@ -205,7 +204,6 @@ def test_disable_static_login_no_connector_blocked_status(harness):
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 @patch("charm.Operator._update_layer")
 def test_config_changed(update, harness):
-    harness.set_leader(True)
     harness.begin()
 
     config_updates = {
@@ -231,7 +229,6 @@ def test_config_changed(update, harness):
 @patch("charm.Operator._update_layer")
 @patch.object(Operator, "ensure_state", ensure_state)
 def test_main_oidc(update, harness):
-    harness.set_leader(True)
     rel_id = harness.add_relation("oidc-client", "app")
 
     harness.add_relation_unit(rel_id, "app/0")
@@ -254,7 +251,6 @@ def test_main_oidc(update, harness):
 @patch("charm.Operator._update_layer")
 @patch.object(Operator, "ensure_state", ensure_state)
 def test_main_ingress(update, harness):
-    harness.set_leader(True)
     rel_id = harness.add_relation("ingress", "app")
     harness.add_relation_unit(rel_id, "app/0")
     harness.update_relation_data(
@@ -277,9 +273,42 @@ def test_main_ingress(update, harness):
 
 
 @patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+def test_ambient_mesh_ingress_leader_calls_submit_config(harness):
+    """Test that submit_config is called exactly once when unit is leader."""
+    harness.set_leader(True)
+    harness.begin()
+
+    # Mock the submit_config method to track calls
+    with patch.object(
+        harness.charm.ingress_unauthenticated, "submit_config"
+    ) as mock_submit_config:
+        # Call the method that should trigger submit_config
+        harness.charm._ambient_mesh_ingress()
+
+        # Verify submit_config was called exactly once
+        mock_submit_config.assert_called_once()
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
+def test_ambient_mesh_ingress_non_leader_does_not_call_submit_config(harness):
+    """Test that submit_config is never called when unit is not leader."""
+    harness.set_leader(False)
+    harness.begin()
+
+    # Mock the submit_config method to track calls
+    with patch.object(
+        harness.charm.ingress_unauthenticated, "submit_config"
+    ) as mock_submit_config:
+        # Call the method that should NOT trigger submit_config
+        harness.charm._ambient_mesh_ingress()
+
+        # Verify submit_config was never called
+        mock_submit_config.assert_not_called()
+
+
+@patch("charm.KubernetesServicePatch", lambda *_, **__: None)
 def test_dex_oidc_config_with_data(harness):
     """Test the relation data has values by default as the charm is broadcasting them."""
-    harness.set_leader(True)
     harness.begin()
 
     rel_id = harness.add_relation(DEX_OIDC_CONFIG_RELATION, "app")
@@ -295,7 +324,6 @@ def test_grpc_relation_with_data_when_data_changes(
     harness,
 ):
     """Test the relation data on config changed events."""
-    harness.set_leader(True)
     # Change the configuration option before starting harness so
     # the correct values are passed to the DexOidcConfig lib
     # FIXME: the correct behaviour should be to change the config
@@ -338,7 +366,6 @@ def test_issuer_url_property_with_issuer_url_config(
     of "http://dex-auth.<namespace>.svc:5556/dex" should be returned; the second case should return
     the value set in the config option.
     """
-    harness.set_leader(True)
     harness.update_config({"issuer-url": issuer_url_config})
     harness.begin()
 
@@ -357,7 +384,6 @@ def test_issuer_url_property_with_issuer_url_config(
 )
 def test_issuer_url_property_with_public_url_config(public_url_config, expected_result, harness):
     """Test the property returns as expected."""
-    harness.set_leader(True)
     harness.update_config({"public-url": public_url_config})
     harness.begin()
     assert harness.charm._issuer_url == expected_result
