@@ -15,6 +15,7 @@ from charmed_kubeflow_chisme.testing import (
     assert_metrics_endpoint,
     deploy_and_assert_grafana_agent,
     deploy_and_integrate_service_mesh_charms,
+    generate_container_securitycontext_map,
     get_alert_rules,
     integrate_with_service_mesh,
 )
@@ -30,6 +31,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 CHARM_ROOT = "."
 DEX_AUTH_APP_NAME = METADATA["name"]
 DEX_AUTH_TRUST = True
@@ -271,3 +273,24 @@ retry_for_5_attempts = Retrying(
     wait=wait_exponential(multiplier=1, min=5, max=10),
     reraise=True,
 )
+
+
+@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
+async def test_container_security_context(
+    ops_test: OpsTest,
+    lightkube_client: lightkube.Client,
+    container_name: str,
+):
+    """Test container security context is correctly set.
+
+    Verify that container spec defines the security context with correct
+    user ID and group ID.
+    """
+    pod_name = get_pod_names(ops_test.model.name, DEX_AUTH_APP_NAME)[0]
+    assert_security_context(
+        lightkube_client,
+        pod_name,
+        container_name,
+        CONTAINERS_SECURITY_CONTEXT_MAP,
+        ops_test.model.name,
+    )
