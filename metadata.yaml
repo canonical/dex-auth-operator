@@ -9,6 +9,17 @@ source: https://github.com/canonical/dex-auth-operator
 issues: https://github.com/canonical/dex-auth-operator/issues
 docs: https://discourse.charmhub.io/t/charmed-dex/8214
 requires:
+  istio-ingress-route-unauthenticated:
+    interface: istio_ingress_route
+  service-mesh:
+    limit: 1
+    interface: service_mesh
+    description: |
+      Integrate this charm into a service mesh
+  require-cmr-mesh:
+    interface: cross_model_mesh
+    description: |
+      If this app relates to other applications on a charmed service mesh cross-model, use this relation to send that related app additional data needed to automatically generate traffic authorization policies.  This is required because Juju does not natively provide all information required to build these policies when related cross-model.
   oidc-client:
     interface: oidc-client
     schema:
@@ -83,6 +94,10 @@ provides:
     interface: grafana_dashboard
   dex-oidc-config:
     interface: dex-oidc-config
+  provide-cmr-mesh:
+    interface: cross_model_mesh
+    description: |
+      If this app is generating polciies to provide access to related applications that are cross-model, relate that app to this additional relation to retrieve additional data required for these policies.  This is required because Juju does not natively provide all information required to build these policies when related cross-model.
 containers:
   dex:
     resource: oci-image
