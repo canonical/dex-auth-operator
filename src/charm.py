@@ -172,7 +172,6 @@ class Operator(CharmBase):
             ],
         )
 
-        # if self.unit.is_leader():
         self.ingress_unauthenticated.submit_config(config)
 
     def _update_layer(self) -> None:
