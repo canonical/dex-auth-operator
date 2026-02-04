@@ -22,7 +22,7 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
       
-    - run: pip install tox
+    - run: pipx install tox
     - run: tox -vve lint
 
   unit-test:
@@ -32,7 +32,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - run: pip install tox
+      - run: pipx install tox
       - run: tox -e unit
 
   terraform-checks:
@@ -45,8 +45,12 @@ jobs:
     name: Integration
     runs-on: ubuntu-24.04
     steps:
+      - name: Maximise GH runner space
+        uses: jlumbroso/free-disk-space@v1.3.1
+
       - name: Check out code
         uses: actions/checkout@v4
+
       - name: Install dependencies
         run: pipx install tox
 
@@ -62,7 +66,7 @@ jobs:
           # Requires the model to be called kubeflow due to this bug:
           # https://github.com/kubeflow/kubeflow/issues/6136
           juju add-model kubeflow
-          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo apt install ./google-chrome-stable_current_amd64.deb
           sudo apt-get install chromium-chromedriver
           tox -e integration -- --model kubeflow
@@ -80,11 +84,11 @@ jobs:
         if: failure()
 
       - name: Get oidc-gatekeeper workload logs
-        run: kubectl logs -l app.kubernetes.io/name=oidc-gatekeeper -n kubeflow
+        run: kubectl logs -l app.kubernetes.io/name=oidc-gatekeeper -n kubeflow -c oidc-authservice
         if: failure()
 
       - name: Get oidc-gatekeeper operator logs
-        run: kubectl logs -l operator.juju.is/name=oidc-gatekeeper -n kubeflow
+        run: kubectl logs -l app.kubernetes.io/name=oidc-gatekeeper -n kubeflow -c charm
         if: failure()
 
       - name: Get dex container logs

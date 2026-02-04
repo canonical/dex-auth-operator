@@ -16,11 +16,12 @@ from charms.loki_k8s.v1.loki_push_api import LogForwarder
 from charms.observability_libs.v1.kubernetes_service_patch import KubernetesServicePatch
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from lightkube.models.core_v1 import ServicePort
-from ops import main
+from ops import ConfigChangedEvent, main
 from ops.charm import CharmBase
 from ops.framework import StoredState
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import ChangeError, Layer
+from owasp_logger import OWASPLogger
 from serialized_data_interface import NoCompatibleVersions, NoVersionsListed, get_interface
 
 METRICS_PATH = "/metrics"
@@ -35,6 +36,9 @@ class Operator(CharmBase):
 
         self.logger: logging.Logger = logging.getLogger(__name__)
         self._namespace = self.model.name
+
+        self._owasp_logger = OWASPLogger(appid="dex.owasp-logger")
+        self.state.set_default(last_static_password="")
 
         # Patch the service to correctly expose the ports to be used
         dex_port = ServicePort(int(self.model.config["port"]), name="dex")
@@ -93,7 +97,6 @@ class Operator(CharmBase):
                     "summary": "entrypoint of the dex-auth-operator image",
                     "command": f"{self._entrypoint} dex serve {self._dex_config_path}",
                     "startup": "enabled",
-                    "user": "_daemon_",
                     "environment": {
                         "KUBERNETES_POD_NAMESPACE": self._namespace,
                     },
@@ -216,6 +219,7 @@ class Operator(CharmBase):
         try:
             self._check_leader()
             self.model.unit.status = MaintenanceStatus("Configuring dex charm")
+            self.log_owasp_events(event)
             self.ensure_state()
             self._update_layer()
             self.handle_ingress()
@@ -225,6 +229,22 @@ class Operator(CharmBase):
             return
 
         self.model.unit.status = ActiveStatus()
+
+    def log_owasp_events(self, event):
+        if not isinstance(event, ConfigChangedEvent):
+            self.logger.debug("Not a config changed-event. Won't log any OWASP event.")
+            return
+
+        self.logger.info("config-changed event detected. Checking if password changed.")
+        config_password = self.model.config["static-password"]
+        stored_password = self.state.last_static_password
+
+        if config_password != stored_password:
+            user = str(self.model.config.get("static-username"))
+            desc = f"The password for user '{user}' was changed."
+            self._owasp_logger.authn_password_change(userid=user, description=desc)
+
+        self.state.last_static_password = config_password
 
     def _generate_dex_auth_config(self) -> str:
         """Returns dex-auth configuration to be passed when (re)starting the dex-auth service.

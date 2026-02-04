@@ -13,8 +13,18 @@ from charmed_kubeflow_chisme.testing import (
     assert_alert_rules,
     assert_logging,
     assert_metrics_endpoint,
+    assert_security_context,
     deploy_and_assert_grafana_agent,
+    generate_container_securitycontext_map,
     get_alert_rules,
+    get_pod_names,
+)
+from charms_dependencies import (
+    ISTIO_GATEWAY,
+    ISTIO_PILOT,
+    KUBEFLOW_DASHBOARD,
+    KUBEFLOW_PROFILES,
+    OIDC_GATEKEEPER,
 )
 from lightkube.resources.apps_v1 import StatefulSet
 from lightkube.resources.core_v1 import Service
@@ -27,44 +37,28 @@ from selenium.webdriver.support.ui import WebDriverWait
 from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+CONTAINERS_SECURITY_CONTEXT_MAP = generate_container_securitycontext_map(METADATA)
 CHARM_ROOT = "."
-DEX_AUTH = "dex-auth"
 DEX_AUTH_APP_NAME = METADATA["name"]
 DEX_AUTH_TRUST = True
 DEX_AUTH_CONFIG = {
     "static-username": "admin",
     "static-password": "foobar",
 }
-
-OIDC_GATEKEEPER = "oidc-gatekeeper"
-OIDC_GATEKEEPER_CHANNEL = "ckf-1.10/stable"
-OIDC_GATEKEEPER_CONFIG = {
-    "client-name": "Ambassador Auth OIDC",
-    "client-secret": "oidc-client-secret",
-}
-
-ISTIO_OPERATORS_CHANNEL = "1.24/stable"
-ISTIO_PILOT = "istio-pilot"
-ISTIO_PILOT_TRUST = True
-ISTIO_PILOT_CONFIG = {"default-gateway": "kubeflow-gateway"}
-ISTIO_GATEWAY = "istio-gateway"
 ISTIO_GATEWAY_APP_NAME = "istio-ingressgateway"
-ISTIO_GATEWAY_TRUST = True
-ISTIO_GATEWAY_CONFIG = {"kind": "ingress"}
-
-KUBEFLOW_PROFILES = "kubeflow-profiles"
-KUBEFLOW_PROFILES_CHANNEL = "1.10/stable"
-KUBEFLOW_PROFILES_TRUST = True
-
-KUBEFLOW_DASHBOARD = "kubeflow-dashboard"
-KUBEFLOW_DASHBOARD_CHANNEL = "1.10/stable"
-KUBEFLOW_DASHBOARD_TRUST = True
 
 log = logging.getLogger(__name__)
 
 
+@pytest.fixture(scope="session")
+def lightkube_client() -> lightkube.Client:
+    """Returns lightkube Kubernetes client"""
+    client = lightkube.Client(field_manager=f"{DEX_AUTH_APP_NAME}")
+    return client
+
+
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test):
+async def test_build_and_deploy(ops_test: OpsTest):
     my_charm = await ops_test.build_charm(".")
     dex_image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     await ops_test.model.deploy(
@@ -84,8 +78,7 @@ async def test_build_and_deploy(ops_test):
 
 
 @pytest.mark.abort_on_fail
-def test_statefulset_readiness(ops_test: OpsTest):
-    lightkube_client = lightkube.Client()
+def test_statefulset_readiness(ops_test: OpsTest, lightkube_client: lightkube.Client):
     for attempt in retry_for_5_attempts:
         log.info(
             f"Waiting for StatefulSet replica(s) to be ready"
@@ -105,69 +98,74 @@ def test_statefulset_readiness(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_relations(ops_test: OpsTest):
     await ops_test.model.deploy(
-        entity_url=ISTIO_PILOT,
-        channel=ISTIO_OPERATORS_CHANNEL,
-        config=ISTIO_PILOT_CONFIG,
-        trust=ISTIO_PILOT_TRUST,
+        entity_url=ISTIO_PILOT.charm,
+        channel=ISTIO_PILOT.channel,
+        config=ISTIO_PILOT.config,
+        trust=ISTIO_PILOT.trust,
     )
 
     await ops_test.model.deploy(
-        entity_url=ISTIO_GATEWAY,
+        entity_url=ISTIO_GATEWAY.charm,
         application_name=ISTIO_GATEWAY_APP_NAME,
-        channel=ISTIO_OPERATORS_CHANNEL,
-        config=ISTIO_GATEWAY_CONFIG,
-        trust=ISTIO_GATEWAY_TRUST,
+        channel=ISTIO_GATEWAY.channel,
+        config=ISTIO_GATEWAY.config,
+        trust=ISTIO_GATEWAY.trust,
     )
-    await ops_test.model.add_relation(
-        ISTIO_PILOT,
+    await ops_test.model.integrate(
+        ISTIO_PILOT.charm,
         ISTIO_GATEWAY_APP_NAME,
     )
 
     await ops_test.model.wait_for_idle(
-        [ISTIO_PILOT, ISTIO_GATEWAY_APP_NAME],
+        [ISTIO_PILOT.charm, ISTIO_GATEWAY_APP_NAME],
         raise_on_blocked=False,
         status="active",
         timeout=90 * 10,
     )
 
     await ops_test.model.deploy(
-        OIDC_GATEKEEPER,
-        channel=OIDC_GATEKEEPER_CHANNEL,
-        config=OIDC_GATEKEEPER_CONFIG,
+        OIDC_GATEKEEPER.charm,
+        channel=OIDC_GATEKEEPER.channel,
+        config=OIDC_GATEKEEPER.config,
     )
-    await ops_test.model.add_relation(
-        f"{OIDC_GATEKEEPER}:dex-oidc-config", f"{DEX_AUTH_APP_NAME}:dex-oidc-config"
+    await ops_test.model.integrate(
+        f"{OIDC_GATEKEEPER.charm}:dex-oidc-config", f"{DEX_AUTH_APP_NAME}:dex-oidc-config"
     )
-    await ops_test.model.add_relation(
-        f"{OIDC_GATEKEEPER}:oidc-client", f"{DEX_AUTH_APP_NAME}:oidc-client"
+    await ops_test.model.integrate(
+        f"{OIDC_GATEKEEPER.charm}:oidc-client", f"{DEX_AUTH_APP_NAME}:oidc-client"
     )
-    await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{DEX_AUTH_APP_NAME}:ingress")
-    await ops_test.model.add_relation(
-        f"{ISTIO_PILOT}:ingress-auth",
-        f"{OIDC_GATEKEEPER}:ingress-auth",
+    await ops_test.model.integrate(f"{ISTIO_PILOT.charm}:ingress", f"{DEX_AUTH_APP_NAME}:ingress")
+    await ops_test.model.integrate(
+        f"{ISTIO_PILOT.charm}:ingress-auth",
+        f"{OIDC_GATEKEEPER.charm}:ingress-auth",
     )
 
     await ops_test.model.deploy(
-        KUBEFLOW_PROFILES,
-        channel=KUBEFLOW_PROFILES_CHANNEL,
-        trust=KUBEFLOW_PROFILES_TRUST,
+        KUBEFLOW_PROFILES.charm,
+        channel=KUBEFLOW_PROFILES.channel,
+        trust=KUBEFLOW_PROFILES.trust,
     )
     await ops_test.model.deploy(
-        KUBEFLOW_DASHBOARD,
-        channel=KUBEFLOW_DASHBOARD_CHANNEL,
-        trust=KUBEFLOW_DASHBOARD_TRUST,
+        KUBEFLOW_DASHBOARD.charm,
+        channel=KUBEFLOW_DASHBOARD.channel,
+        trust=KUBEFLOW_DASHBOARD.trust,
     )
-    await ops_test.model.add_relation(KUBEFLOW_PROFILES, KUBEFLOW_DASHBOARD)
-    await ops_test.model.add_relation(f"{ISTIO_PILOT}:ingress", f"{KUBEFLOW_DASHBOARD}:ingress")
+    await ops_test.model.integrate(
+        f"{KUBEFLOW_PROFILES.charm}:kubeflow-profiles",
+        f"{KUBEFLOW_DASHBOARD.charm}:kubeflow-profiles",
+    )
+    await ops_test.model.integrate(
+        f"{ISTIO_PILOT.charm}:ingress", f"{KUBEFLOW_DASHBOARD.charm}:ingress"
+    )
 
     await ops_test.model.wait_for_idle(
         apps=[
             DEX_AUTH_APP_NAME,
-            ISTIO_PILOT,
+            ISTIO_PILOT.charm,
             ISTIO_GATEWAY_APP_NAME,
-            OIDC_GATEKEEPER,
-            KUBEFLOW_PROFILES,
-            KUBEFLOW_DASHBOARD,
+            OIDC_GATEKEEPER.charm,
+            KUBEFLOW_PROFILES.charm,
+            KUBEFLOW_DASHBOARD.charm,
         ],
         status="active",
         raise_on_blocked=False,
@@ -176,8 +174,7 @@ async def test_relations(ops_test: OpsTest):
     )
 
 
-def get_public_url(service_name: str, namespace: str):
-    lightkube_client = lightkube.Client()
+def get_public_url(service_name: str, namespace: str, lightkube_client: lightkube.Client):
     gateway_svc = lightkube_client.get(Service, service_name, namespace=namespace)
 
     endpoint = gateway_svc.status.loadBalancer.ingress[0].ip
@@ -186,15 +183,16 @@ def get_public_url(service_name: str, namespace: str):
 
 
 @pytest.fixture()
-async def driver(ops_test: OpsTest):
+async def driver(ops_test: OpsTest, lightkube_client: lightkube.Client):
     public_url = get_public_url(
         service_name="istio-ingressgateway-workload",
         namespace=ops_test.model_name,
+        lightkube_client=lightkube_client,
     )
 
     # Oidc may get blocked and recreate the unit
     await ops_test.model.wait_for_idle(
-        [DEX_AUTH_APP_NAME, OIDC_GATEKEEPER],
+        [DEX_AUTH_APP_NAME, OIDC_GATEKEEPER.charm],
         status="active",
         raise_on_blocked=False,
         raise_on_error=False,
@@ -221,13 +219,13 @@ async def driver(ops_test: OpsTest):
         driver.get_screenshot_as_file("/tmp/selenium-dashboard.png")
 
 
-def fix_queryselector(elems):
+def fix_queryselector(elems: list[str]):
     selectors = '").shadowRoot.querySelector("'.join(elems)
     return 'return document.querySelector("' + selectors + '")'
 
 
-def test_login(driver):
-    driver, wait, url = driver
+def test_login(driver: webdriver.Chrome):
+    driver, wait, _ = driver
 
     driver.get_screenshot_as_file("/tmp/selenium-logon.png")
     # Log in using dex credentials
@@ -240,7 +238,7 @@ def test_login(driver):
     wait.until(lambda x: x.execute_script(script))
 
 
-async def test_alert_rules(ops_test):
+async def test_alert_rules(ops_test: OpsTest):
     """Test check charm alert rules and rules defined in relation data bag."""
     app = ops_test.model.applications[DEX_AUTH_APP_NAME]
     alert_rules = get_alert_rules()
@@ -248,7 +246,7 @@ async def test_alert_rules(ops_test):
     await assert_alert_rules(app, alert_rules)
 
 
-async def test_metrics_enpoint(ops_test):
+async def test_metrics_endpoint(ops_test: OpsTest):
     """Test metrics_endpoints are defined in relation data bag and their accessibility.
 
     This function gets all the metrics_endpoints from the relation data bag, checks if
@@ -259,7 +257,7 @@ async def test_metrics_enpoint(ops_test):
     await assert_metrics_endpoint(app, metrics_port=5558, metrics_path="/metrics")
 
 
-async def test_logging(ops_test):
+async def test_logging(ops_test: OpsTest):
     """Test logging is defined in relation data bag."""
     app = ops_test.model.applications[GRAFANA_AGENT_APP]
     await assert_logging(app)
@@ -271,3 +269,24 @@ retry_for_5_attempts = Retrying(
     wait=wait_exponential(multiplier=1, min=5, max=10),
     reraise=True,
 )
+
+
+@pytest.mark.parametrize("container_name", list(CONTAINERS_SECURITY_CONTEXT_MAP.keys()))
+async def test_container_security_context(
+    ops_test: OpsTest,
+    lightkube_client: lightkube.Client,
+    container_name: str,
+):
+    """Test container security context is correctly set.
+
+    Verify that container spec defines the security context with correct
+    user ID and group ID.
+    """
+    pod_name = get_pod_names(ops_test.model.name, DEX_AUTH_APP_NAME)[0]
+    assert_security_context(
+        lightkube_client,
+        pod_name,
+        container_name,
+        CONTAINERS_SECURITY_CONTEXT_MAP,
+        ops_test.model.name,
+    )
