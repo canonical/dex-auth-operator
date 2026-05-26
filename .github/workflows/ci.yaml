@@ -180,7 +180,7 @@ jobs:
 
       - name: Get juju status
         run: juju status --relations
-        if: failure()
+        if: always()
 
       - name: Get oidc-gatekeeper workload logs
         run: kubectl logs -l app.kubernetes.io/name=oidc-gatekeeper -n kubeflow -c oidc-authservice
