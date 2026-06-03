@@ -58,11 +58,15 @@ def lightkube_client() -> lightkube.Client:
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
-    my_charm = await ops_test.build_charm(".")
+async def test_build_and_deploy(ops_test: OpsTest, request):
+    entity_url = (
+        await ops_test.build_charm(".")
+        if not (entity_url := request.config.getoption("--charm-path"))
+        else entity_url
+    )
     dex_image_path = METADATA["resources"]["oci-image"]["upstream-source"]
     await ops_test.model.deploy(
-        my_charm,
+        entity_url,
         resources={"oci-image": dex_image_path},
         trust=DEX_AUTH_TRUST,
         config=DEX_AUTH_CONFIG,
